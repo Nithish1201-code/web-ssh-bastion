@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web SSH Bastion</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/xterm@5.0.0/css/xterm.min.css"
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        background: #1e1e1e;
+        color: #d4d4d4;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+
+      .sidebar {
+        width: 250px;
+        background: #252526;
+        border-right: 1px solid #3e3e42;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .sidebar h2 {
+        font-size: 14px;
+        color: #858585;
+        text-transform: uppercase;
+        margin-bottom: 15px;
+        margin-top: 20px;
+      }
+
+      .sidebar h2:first-child {
+        margin-top: 0;
+      }
+
+      .target-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .target-btn {
+        padding: 10px 12px;
+        background: #2d2d30;
+        border: 1px solid #3e3e42;
+        color: #cccccc;
+        cursor: pointer;
+        border-radius: 3px;
+        font-size: 13px;
+        transition: all 0.2s;
+      }
+
+      .target-btn:hover {
+        background: #3e3e42;
+        border-color: #007acc;
+        color: #ffffff;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: #2d2d30;
+        border-bottom: 1px solid #3e3e42;
+        padding: 10px 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .header h1 {
+        font-size: 14px;
+        color: #cccccc;
+      }
+
+      .status {
+        font-size: 12px;
+        color: #858585;
+      }
+
+      .status.ready {
+        color: #4ec9b0;
+      }
+
+      .tabs {
+        background: #1e1e1e;
+        border-bottom: 1px solid #3e3e42;
+        display: flex;
+        gap: 0;
+        padding-left: 10px;
+        overflow-x: auto;
+      }
+
+      .tab {
+        padding: 10px 15px;
+        background: #2d2d30;
+        border: 1px solid #3e3e42;
+        border-bottom: none;
+        color: #858585;
+        cursor: pointer;
+        font-size: 12px;
+        border-radius: 3px 3px 0 0;
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        white-space: nowrap;
+      }
+
+      .tab.active {
+        background: #1e1e1e;
+        color: #cccccc;
+        border: 1px solid #3e3e42;
+        border-bottom: 1px solid #1e1e1e;
+      }
+
+      .tab-close {
+        cursor: pointer;
+        opacity: 0.6;
+        font-weight: bold;
+      }
+
+      .tab-close:hover {
+        opacity: 1;
+      }
+
+      .terminal-container {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+        background: #1e1e1e;
+      }
+
+      .terminal {
+        height: 100%;
+        padding: 10px;
+      }
+
+      .xterm {
+        height: 100%;
+      }
+
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100%;
+        color: #858585;
+        font-size: 13px;
+      }
+
+      .error {
+        padding: 20px;
+        color: #f48771;
+        background: #1e1e1e;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="sidebar">
+        <h2>Targets</h2>
+        <div class="target-list" id="targetList"></div>
+
+        <h2>Info</h2>
+        <div class="status" id="statusInfo">Loading...</div>
+      </div>
+
+      <div class="main">
+        <div class="header">
+          <h1>Web SSH Bastion</h1>
+          <div class="status" id="connectionStatus">Connecting...</div>
+        </div>
+
+        <div class="tabs" id="tabs"></div>
+
+        <div class="terminal-container" id="terminalContainer">
+          <div class="loading">Open a terminal to get started</div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.0.0/lib/xterm.min.js"></script>
+    <script>
+      class TerminalApp {
+        constructor() {
+          this.terminals = new Map(); // sessionId -> { ws, term, element, target }
+          this.activeSessionId = null;
+          this.targets = [];
+          this.wsUrl = this.getWsUrl();
+          this.init();
+        }
+
+        getWsUrl() {
+          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+          return `${protocol}//${window.location.host}`;
+        }
+
+        async init() {
+          await this.loadTargets();
+          this.renderTargets();
+          this.updateStatus();
+        }
+
+        async loadTargets() {
+          try {
+            const response = await fetch('/api/targets');
+            const data = await response.json();
+            this.targets = data.targets;
+            this.mode = data.mode;
+            document.getElementById(
+              'statusInfo'
+            ).textContent = `Mode: ${this.mode}\n\nTargets: ${this.targets.length}`;
+          } catch (err) {
+            console.error('Failed to load targets:', err);
+            document.getElementById('statusInfo').textContent =
+              'Error loading targets';
+          }
+        }
+
+        renderTargets() {
+          const list = document.getElementById('targetList');
+          list.innerHTML = this.targets
+            .map(
+              (target) => `
+            <button class="target-btn" onclick="app.openTerminal('${target.id}', '${target.name}')">
+              ${target.name}
+            </button>
+          `
+            )
+            .join('');
+        }
+
+        openTerminal(targetId, targetName) {
+          const sessionId = `terminal-${Date.now()}`;
+          const ws = new WebSocket(this.wsUrl);
+
+          ws.onopen = () => {
+            // Request to open terminal
+            ws.send(
+              JSON.stringify({
+                type: 'open',
+                targetId,
+                cols: 80,
+                rows: 24,
+              })
+            );
+          };
+
+          ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+
+            if (msg.type === 'ready') {
+              this.setActiveTerminal(sessionId);
+            } else if (msg.type === 'output') {
+              const term = this.terminals.get(sessionId)?.term;
+              if (term) {
+                term.write(msg.data);
+              }
+            } else if (msg.type === 'close') {
+              this.closeTerminal(sessionId);
+            } else if (msg.type === 'error') {
+              console.error('Terminal error:', msg.error);
+              const term = this.terminals.get(sessionId)?.term;
+              if (term) {
+                term.write(`\r\nError: ${msg.error}\r\n`);
+              }
+            }
+          };
+
+          ws.onerror = (err) => {
+            console.error('WebSocket error:', err);
+          };
+
+          ws.onclose = () => {
+            this.closeTerminal(sessionId);
+          };
+
+          // Create terminal
+          const term = new Terminal({
+            cols: 80,
+            rows: 24,
+            theme: {
+              background: '#1e1e1e',
+              foreground: '#d4d4d4',
+            },
+          });
+
+          const element = document.createElement('div');
+          element.className = 'terminal';
+          element.id = `terminal-${sessionId}`;
+
+          // Store terminal
+          this.terminals.set(sessionId, {
+            ws,
+            term,
+            element,
+            target: targetName,
+          });
+
+          // Add tab
+          this.addTab(sessionId, targetName);
+
+          // Render terminal
+          this.renderTerminal(sessionId);
+
+          // Handle input
+          term.onData((data) => {
+            ws.send(
+              JSON.stringify({
+                type: 'input',
+                sessionId,
+                data,
+              })
+            );
+          });
+
+          // Handle resize
+          term.onResize(({ cols, rows }) => {
+            ws.send(
+              JSON.stringify({
+                type: 'resize',
+                sessionId,
+                cols,
+                rows,
+              })
+            );
+          });
+        }
+
+        addTab(sessionId, targetName) {
+          const tabs = document.getElementById('tabs');
+          const tab = document.createElement('div');
+          tab.className = 'tab';
+          tab.id = `tab-${sessionId}`;
+          tab.innerHTML = `
+            <span>${targetName}</span>
+            <span class="tab-close" onclick="app.closeTerminal('${sessionId}')">×</span>
+          `;
+          tab.onclick = () => this.setActiveTerminal(sessionId);
+          tabs.appendChild(tab);
+        }
+
+        setActiveTerminal(sessionId) {
+          // Update active state
+          if (this.activeSessionId) {
+            const oldTab = document.getElementById(`tab-${this.activeSessionId}`);
+            if (oldTab) oldTab.classList.remove('active');
+          }
+
+          this.activeSessionId = sessionId;
+          const tab = document.getElementById(`tab-${sessionId}`);
+          if (tab) tab.classList.add('active');
+
+          // Show terminal
+          this.renderTerminal(sessionId);
+        }
+
+        renderTerminal(sessionId) {
+          const container = document.getElementById('terminalContainer');
+          container.innerHTML = '';
+
+          const terminalData = this.terminals.get(sessionId);
+          if (terminalData) {
+            terminalData.element.innerHTML = '';
+            terminalData.term.open(terminalData.element);
+            terminalData.term.focus();
+            container.appendChild(terminalData.element);
+          }
+        }
+
+        closeTerminal(sessionId) {
+          const terminal = this.terminals.get(sessionId);
+          if (terminal) {
+            if (terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
+              terminal.ws.send(
+                JSON.stringify({
+                  type: 'close',
+                  sessionId,
+                })
+              );
+              terminal.ws.close();
+            }
+
+            terminal.term.dispose();
+            this.terminals.delete(sessionId);
+
+            // Remove tab
+            const tab = document.getElementById(`tab-${sessionId}`);
+            if (tab) tab.remove();
+
+            // If was active, switch to another terminal
+            if (this.activeSessionId === sessionId) {
+              const remaining = Array.from(this.terminals.keys())[0];
+              if (remaining) {
+                this.setActiveTerminal(remaining);
+              } else {
+                this.activeSessionId = null;
+                document.getElementById('terminalContainer').innerHTML =
+                  '<div class="loading">Open a terminal to get started</div>';
+              }
+            }
+          }
+        }
+
+        updateStatus() {
+          const statusEl = document.getElementById('connectionStatus');
+          statusEl.textContent = 'Ready';
+          statusEl.classList.add('ready');
+        }
+      }
+
+      const app = new TerminalApp();
+    </script>
+  </body>
+</html>

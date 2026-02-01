@@ -37,6 +37,17 @@ bower_components
 # Compiled binary addons (https://nodejs.org/api/addons.html)
 build/Release
 
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# SSH keys and secrets
+/keys/
+*.pem
+*.pub
+id_ed25519*
+
 # Dependency directories
 node_modules/
 jspm_packages/
