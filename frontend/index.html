@@ -898,6 +898,7 @@
                 );
               };
 
+              let sessionReady = false;
               ws.onmessage = (event) => {
                 const msg = JSON.parse(event.data);
                 const session = this.terminals.get(sessionId);
@@ -906,6 +907,10 @@
 
                 if (msg.type === 'ready') {
                   this.logDebug('Terminal ready', { sessionId });
+                  sessionReady = true;
+                  session.term.focus();
+                  session.fitAddon.fit();
+                  session.sendResize?.();
                   this.focusSession(sessionId);
                 } else if (msg.type === 'output') {
                   session.term.write(msg.data);
@@ -1039,6 +1044,7 @@
               let lastSize = { cols: null, rows: null };
               let resizeScheduled = false;
               const sendResize = () => {
+                if (!sessionReady) return;
                 if (ws.readyState !== WebSocket.OPEN) return;
                 if (lastSize.cols === term.cols && lastSize.rows === term.rows) return;
                 lastSize = { cols: term.cols, rows: term.rows };
@@ -1055,22 +1061,17 @@
               const scheduleResize = () => {
                 if (resizeScheduled) return;
                 resizeScheduled = true;
-                requestAnimationFrame(() => {
+                window.setTimeout(() => {
                   resizeScheduled = false;
                   fitAddon.fit();
                   sendResize();
-                });
+                }, 100);
               };
 
-              sendResize();
+              const resizeHandler = () => scheduleResize();
+              window.addEventListener('resize', resizeHandler);
 
               let observer = null;
-              if (typeof ResizeObserver !== 'undefined') {
-                observer = new ResizeObserver(() => {
-                  scheduleResize();
-                });
-                observer.observe(terminalEl);
-              }
 
               term.onData((data) => {
                 ws.send(
@@ -1089,6 +1090,8 @@
                 tile: tileEl,
                 target,
                 observer,
+                resizeHandler,
+                sendResize,
               });
 
               this.authByTarget.set(targetKey, authState);
@@ -1145,6 +1148,9 @@
                 session.ws.close();
               }
 
+              if (session.resizeHandler) {
+                window.removeEventListener('resize', session.resizeHandler);
+              }
               session.observer?.disconnect();
               session.term.dispose();
               this.grid.removeWidget(session.tile);
