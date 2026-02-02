@@ -513,6 +513,7 @@
               this.terminals = new Map();
               this.activeSessionId = null;
               this.filterType = 'all';
+              this.authByTarget = new Map();
               this.wsUrl = this.getWsUrl();
               this.grid = GridStack.init(
                 {
@@ -660,7 +661,7 @@
               });
             }
 
-            openTerminal(target, layout) {
+            openTerminal(target, layout, retryState = {}) {
               if (target.status !== 'running') {
                 this.toast('Target is offline.');
                 return;
@@ -668,6 +669,21 @@
               if (!target.host) {
                 this.toast('Target has no reachable host/IP.');
                 return;
+              }
+
+              const authState = this.authByTarget.get(target.id) || {
+                password: null,
+                hostKeyAccepted: false,
+              };
+
+              if (retryState.forcePasswordPrompt || (!authState.password && authState.hostKeyAccepted)) {
+                const password = window.prompt(`Enter SSH password for ${target.name}`);
+                if (!password) {
+                  this.toast('Password required to open terminal.');
+                  return;
+                }
+                authState.password = password;
+                retryState.forcePasswordPrompt = false;
               }
 
               const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -681,6 +697,8 @@
                     sessionId,
                     cols: 80,
                     rows: 24,
+                    password: authState.password,
+                    acceptHostKey: authState.hostKeyAccepted,
                   })
                 );
               };
@@ -698,6 +716,28 @@
                 } else if (msg.type === 'close') {
                   this.closeTerminal(sessionId);
                 } else if (msg.type === 'error') {
+                  if (msg.code === 'HOSTKEY') {
+                    const confirm = window.prompt(
+                      `Host key fingerprint for ${target.name}: ${msg.fingerprint}\nType YES to trust and continue`
+                    );
+                    if (confirm && confirm.toLowerCase() === 'yes') {
+                      authState.hostKeyAccepted = true;
+                      this.authByTarget.set(target.id, authState);
+                      this.closeTerminal(sessionId);
+                      this.openTerminal(target, layout, { forcePasswordPrompt: !authState.password });
+                      return;
+                    }
+                    this.toast('Host key not accepted.');
+                    this.closeTerminal(sessionId);
+                    return;
+                  }
+
+                  if (msg.code === 'NO_AUTH') {
+                    this.closeTerminal(sessionId);
+                    this.openTerminal(target, layout, { forcePasswordPrompt: true });
+                    return;
+                  }
+
                   session.term.write(`\r\nError: ${msg.error}\r\n`);
                 }
               };
@@ -832,6 +872,8 @@
                 target,
                 observer,
               });
+
+              this.authByTarget.set(target.id, authState);
 
               this.addSessionTab(sessionId, target);
               this.hideEmptyState();

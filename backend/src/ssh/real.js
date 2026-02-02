@@ -1,5 +1,6 @@
 const { Client: SSHClient } = require('ssh2');
 const fs = require('fs');
+const crypto = require('crypto');
 const { EventEmitter } = require('events');
 
 /**
@@ -16,20 +17,56 @@ class RealSSHSession extends EventEmitter {
     this.connected = false;
   }
 
-  connect(target) {
+  connect(target, auth = {}) {
     return new Promise((resolve, reject) => {
       this.sshClient = new SSHClient();
+
+      const acceptHostKey = auth.acceptHostKey === true;
+      const password = auth.password || '';
+      const hasKey = this.config.sshKeyPath && fs.existsSync(this.config.sshKeyPath);
+
+      if (!hasKey && !password) {
+        const error = new Error('Missing SSH credentials: provide password or SSH key.');
+        error.code = 'NO_AUTH';
+        this.emit('error', error);
+        reject(error);
+        return;
+      }
+
+      let hostKeyRejected = false;
+      const hostVerifier = (key) => {
+        if (acceptHostKey) {
+          return true;
+        }
+        if (!hostKeyRejected) {
+          const fingerprint = `SHA256:${crypto.createHash('sha256').update(key).digest('base64')}`;
+          const error = new Error('Host key not accepted');
+          error.code = 'HOSTKEY';
+          error.fingerprint = fingerprint;
+          hostKeyRejected = true;
+          this.emit('error', error);
+        }
+        return false;
+      };
 
       // SSH connection options
       const sshConfig = {
         host: target.host,
         port: this.config.sshPort,
         username: this.config.sshUser,
-        privateKey: fs.readFileSync(this.config.sshKeyPath),
+        hostVerifier,
         algorithms: {
           serverHostKey: ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ssh-rsa'],
         },
       };
+
+      if (hasKey) {
+        sshConfig.privateKey = fs.readFileSync(this.config.sshKeyPath);
+      }
+
+      if (password) {
+        sshConfig.password = password;
+      }
 
       this.sshClient.on('ready', () => {
         this.connected = true;

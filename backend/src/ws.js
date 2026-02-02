@@ -45,7 +45,7 @@ class TerminalManager {
 
           if (msg.type === 'open') {
             // Open new SSH terminal
-            const { targetId, cols, rows, sessionId: preferredSessionId } = msg;
+            const { targetId, cols, rows, sessionId: preferredSessionId, password, acceptHostKey } = msg;
             const target = await targetService.getTargetById(targetId);
             if (!target) {
               ws.send(
@@ -63,6 +63,7 @@ class TerminalManager {
 
             // Set up event listeners
             session.on('ready', () => {
+              if (ws.readyState !== WebSocket.OPEN) return;
               ws.send(
                 JSON.stringify({
                   type: 'ready',
@@ -72,6 +73,7 @@ class TerminalManager {
             });
 
             session.on('data', (data) => {
+              if (ws.readyState !== WebSocket.OPEN) return;
               ws.send(
                 JSON.stringify({
                   type: 'output',
@@ -82,26 +84,31 @@ class TerminalManager {
             });
 
             session.on('error', (err) => {
+              if (ws.readyState !== WebSocket.OPEN) return;
               ws.send(
                 JSON.stringify({
                   type: 'error',
                   sessionId,
                   error: err.message,
+                  code: err.code,
+                  fingerprint: err.fingerprint,
                 })
               );
             });
 
             session.on('close', () => {
-              ws.send(
-                JSON.stringify({
-                  type: 'close',
-                  sessionId,
-                })
-              );
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(
+                  JSON.stringify({
+                    type: 'close',
+                    sessionId,
+                  })
+                );
+              }
               this.removeSession(sessionId);
             });
 
-            await session.connect(target);
+            await session.connect(target, { password, acceptHostKey });
           } else if (msg.type === 'input') {
             // Send input to SSH session
             const { sessionId, data } = msg;
