@@ -86,6 +86,65 @@ function validateUrl(value) {
   }
 }
 
+function validateTokenPart(value) {
+  return value ? true : 'Value is required.';
+}
+
+function buildTokenValue(user, tokenName, tokenSecret) {
+  return `${user}!${tokenName}=${tokenSecret}`;
+}
+
+function getDispatcher(allowInsecure) {
+  if (!allowInsecure) return undefined;
+  try {
+    // Optional dependency, used when available.
+    // eslint-disable-next-line global-require
+    const { Agent } = require('undici');
+    return new Agent({
+      connect: {
+        rejectUnauthorized: false,
+      },
+    });
+  } catch (error) {
+    return undefined;
+  }
+}
+
+async function testProxmoxConnection(values) {
+  const url = new URL(values.PROXMOX_API_URL);
+  url.pathname = `${url.pathname.replace(/\/$/, '')}/version`;
+
+  const allowInsecure = values.PROXMOX_API_INSECURE === '1';
+  const dispatcher = getDispatcher(allowInsecure);
+  const previousReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+
+  if (allowInsecure && !dispatcher) {
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  }
+
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `PVEAPIToken=${values.PROXMOX_API_TOKEN}`,
+        Accept: 'application/json',
+      },
+      dispatcher,
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Proxmox API error ${response.status}: ${text}`);
+    }
+
+    await response.json();
+    console.log('Proxmox API token verified.');
+  } finally {
+    if (allowInsecure && !dispatcher) {
+      process.env.NODE_TLS_REJECT_UNAUTHORIZED = previousReject || '';
+    }
+  }
+}
+
 async function ensureEnvConfig() {
   const existing = readEnvFile();
   const defaults = {
@@ -102,6 +161,15 @@ async function ensureEnvConfig() {
     SSH_TARGETS: existing.SSH_TARGETS || '[]',
   };
 
+  const proxmoxUser = await askForValue('Proxmox user', defaults.PROXMOX_USER, validateNonEmpty);
+
+  let proxmoxToken = defaults.PROXMOX_API_TOKEN;
+  if (!proxmoxToken) {
+    const tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
+    const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
+    proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+  }
+
   const values = {
     SSH_USER: await askForValue('SSH user', defaults.SSH_USER, validateNonEmpty),
     SSH_KEY_PATH: await askForValue('SSH key path', defaults.SSH_KEY_PATH, validateNonEmpty),
@@ -109,12 +177,14 @@ async function ensureEnvConfig() {
     PORT: await askForValue('App port', defaults.PORT, validatePort),
     HOST: await askForValue('App host', defaults.HOST, validateNonEmpty),
     PROXMOX_API_URL: await askForValue('Proxmox API URL', defaults.PROXMOX_API_URL, validateUrl),
-    PROXMOX_API_TOKEN: await askForValue('Proxmox API token', defaults.PROXMOX_API_TOKEN),
-    PROXMOX_USER: await askForValue('Proxmox user (optional)', defaults.PROXMOX_USER),
+    PROXMOX_API_TOKEN: proxmoxToken,
+    PROXMOX_USER: proxmoxUser,
     PROXMOX_API_INSECURE: await askForValue('Allow insecure TLS (0 or 1)', defaults.PROXMOX_API_INSECURE, validateBooleanFlag),
     PROXMOX_NODE: await askForValue('Proxmox node (optional)', defaults.PROXMOX_NODE),
     SSH_TARGETS: await askForValue('SSH targets JSON (optional)', defaults.SSH_TARGETS),
   };
+
+  await testProxmoxConnection(values);
 
   writeEnvFile(values);
   Object.entries(values).forEach(([key, value]) => {
@@ -130,7 +200,10 @@ async function ensureProxmoxToken() {
     return process.env.PROXMOX_API_TOKEN;
   }
 
-  const token = await askForValue('Proxmox API token', '');
+  const user = await askForValue('Proxmox user', '', validateNonEmpty);
+  const tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
+  const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
+  const token = buildTokenValue(user, tokenName, tokenSecret);
   if (!token) {
     throw new Error('Missing Proxmox API token. Set PROXMOX_API_TOKEN in .env');
   }
