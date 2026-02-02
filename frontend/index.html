@@ -1109,20 +1109,3 @@
         </script>
       </body>
     </html>
-
-            hideEmptyState() {
-              document.getElementById('emptyState').style.display = 'none';
-            }
-
-            toast(message) {
-              const toast = document.getElementById('toast');
-              toast.textContent = message;
-              toast.classList.add('show');
-              setTimeout(() => toast.classList.remove('show'), 2000);
-            }
-          }
-
-          const app = new TerminalApp();
-        </script>
-      </body>
-    </html>
