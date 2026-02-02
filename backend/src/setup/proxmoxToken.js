@@ -236,21 +236,18 @@ async function ensureEnvConfig() {
       console.log(`Using API token: PVEAPIToken=${proxmoxToken}`);
       break;
     }
-    const runNow = await askForValue('Run the commands now? (y/n)', 'y', validateYesNo);
-    if (runNow.toLowerCase() === 'y') {
-      if (!tokenName) {
-        tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
-      }
-      try {
-        await runPermissions(proxmoxUser, tokenName);
-        console.log('Permissions applied.');
-        console.log(`Using API token: PVEAPIToken=${proxmoxToken}`);
-        break;
-      } catch (error) {
-        console.error(`Failed to apply permissions: ${error.message}`);
-      }
+    if (!tokenName) {
+      tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
     }
-    console.log('Run the commands, then confirm to continue.');
+    try {
+      await runPermissions(proxmoxUser, tokenName);
+      console.log('Permissions applied.');
+      console.log(`Using API token: PVEAPIToken=${proxmoxToken}`);
+      break;
+    } catch (error) {
+      console.error(`Failed to apply permissions: ${error.message}`);
+      console.log('Run the commands manually, then confirm to continue.');
+    }
   }
 
   const useWebAuth = await askForValue('Use password auth for web UI? (y/n)', defaults.WEB_AUTH_ENABLED === '1' ? 'y' : 'n', validateYesNo);
@@ -280,10 +277,14 @@ async function ensureEnvConfig() {
 
   while (true) {
     try {
+      console.log(`Testing Proxmox API with header: Authorization: PVEAPIToken=${values.PROXMOX_API_TOKEN}`);
       await testProxmoxConnection(values);
       break;
     } catch (error) {
       console.error(`Proxmox API test failed: ${error.message}`);
+      if (error.message.includes('401')) {
+        console.error('401 means the token is invalid or for a different user/realm. Ensure it matches USER@REALM!TOKENID=UUID.');
+      }
       const retry = await askForValue('Retry Proxmox API test? (y/n)', 'y', validateYesNo);
       if (retry.toLowerCase() !== 'y') {
         throw new Error('Proxmox API verification failed. Aborting setup.');
