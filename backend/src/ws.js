@@ -27,10 +27,10 @@ class TerminalManager {
 
   removeSession(sessionId) {
     const session = this.sessions.get(sessionId);
-    if (session) {
-      session.destroy();
-      this.sessions.delete(sessionId);
-    }
+    if (!session) return;
+    this.sessions.delete(sessionId);
+    session.removeAllListeners?.();
+    session.destroy();
   }
 
   setupWebSocketServer(server) {

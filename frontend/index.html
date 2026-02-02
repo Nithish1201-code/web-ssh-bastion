@@ -652,6 +652,15 @@
               return `${protocol}://${window.location.host}`;
             }
 
+            getTargetKey(target) {
+              return (
+                target.id ??
+                `${(target.type ?? 'target').toString()}:${(target.vmid ?? '').toString()}:${(target.name ?? '').toString()}:${
+                  (target.host ?? '').toString()
+                }:${(target.ip ?? '').toString()}`
+              );
+            }
+
             bindUI() {
               document.getElementById('refreshBtn')?.addEventListener('click', () => this.reload());
               document.getElementById('newSessionBtn')?.addEventListener('click', () => {
@@ -794,6 +803,7 @@
               list.innerHTML = filtered
                 .map(
                   (target) => {
+                    const targetKey = this.getTargetKey(target);
                     const type = (target.type ?? 'unknown').toString();
                     const status = (target.status ?? 'unknown').toString();
                     const name = (target.name ?? 'Unknown').toString();
@@ -813,8 +823,8 @@
                     </div>
                     <div class="target-meta">${ip} · ${os} · ${username}</div>
                     <div class="target-actions">
-                      <button class="btn" data-action="open" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Terminal</button>
-                      <button class="btn" data-action="open-split" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Split</button>
+                      <button class="btn" data-action="open" data-id="${targetKey}" ${target.status !== 'running' ? 'disabled' : ''}>Open Terminal</button>
+                      <button class="btn" data-action="open-split" data-id="${targetKey}" ${target.status !== 'running' ? 'disabled' : ''}>Open Split</button>
                     </div>
                   </div>
                 `;
@@ -828,7 +838,7 @@
                     this.toast('Target is offline.');
                     return;
                   }
-                  const target = this.targets.find((t) => t.id === button.dataset.id);
+                  const target = this.targets.find((t) => this.getTargetKey(t) === button.dataset.id);
                   if (!target) return;
                   const isSplit = button.dataset.action === 'open-split';
                   this.openTerminal(target, isSplit ? { w: 3, h: 4 } : undefined);
@@ -849,17 +859,18 @@
                 this.toast('Target is offline.');
                 return;
               }
-              if (!target.host) {
+              if (!target.host && !target.ip) {
                 this.toast('Target has no reachable host/IP.');
                 return;
               }
 
-              const authState = this.authByTarget.get(target.id) || {
+              const targetKey = this.getTargetKey(target);
+              const authState = this.authByTarget.get(targetKey) || {
                 password: null,
                 hostKeyAccepted: false,
               };
 
-              if (retryState.forcePasswordPrompt || (!authState.password && authState.hostKeyAccepted)) {
+              if (retryState.forcePasswordPrompt || !authState.password) {
                 const password = window.prompt(`Enter SSH password for ${target.name}`);
                 if (!password) {
                   this.toast('Password required to open terminal.');
@@ -909,7 +920,7 @@
                     );
                     if (confirm && confirm.toLowerCase() === 'yes') {
                       authState.hostKeyAccepted = true;
-                      this.authByTarget.set(target.id, authState);
+                      this.authByTarget.set(targetKey, authState);
                       this.closeTerminal(sessionId);
                       this.openTerminal(target, layout, { forcePasswordPrompt: !authState.password });
                       return;
@@ -1068,7 +1079,7 @@
                 observer,
               });
 
-              this.authByTarget.set(target.id, authState);
+              this.authByTarget.set(targetKey, authState);
 
               this.addSessionTab(sessionId, target);
               this.hideEmptyState();

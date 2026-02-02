@@ -15,6 +15,7 @@ class RealSSHSession extends EventEmitter {
     this.sshClient = null;
     this.stream = null;
     this.connected = false;
+    this.closed = false;
   }
 
   connect(target, auth = {}) {
@@ -145,6 +146,8 @@ class RealSSHSession extends EventEmitter {
   }
 
   end() {
+    if (this.closed) return;
+    this.closed = true;
     if (this.stream) {
       this.stream.end();
       this.stream = null;
