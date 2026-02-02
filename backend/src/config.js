@@ -30,13 +30,13 @@ const config = {
   },
   get webAuthEnabled() {
     return (process.env.WEB_AUTH_ENABLED || '0') === '1';
-  }
+  },
   get webAuthUser() {
     return process.env.WEB_AUTH_USER || '';
-  }
+  },
   get webAuthPass() {
     return process.env.WEB_AUTH_PASS || '';
-  }
+  },
   get isDev() {
     return process.env.NODE_ENV !== 'production';
   },

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Web SSH Bastion • Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #030712;
+        --panel: rgba(17, 24, 39, 0.4);
+        --border: rgba(255, 255, 255, 0.08);
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --accent: #00e5ff;
+        --accent-2: #06b6d4;
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+      }
+
+      .blob {
+        position: absolute;
+        border-radius: 999px;
+        filter: blur(100px);
+        mix-blend-mode: screen;
+        animation-timing-function: ease-in-out;
+        animation-iteration-count: infinite;
+        animation-direction: alternate;
+      }
+
+      @keyframes blob {
+        0% { transform: translate(0px, 0px) scale(1); }
+        33% { transform: translate(400px, -300px) scale(1.2); }
+        66% { transform: translate(-200px, 300px) scale(0.8); }
+        100% { transform: translate(0px, 0px) scale(1); }
+      }
+
+      @keyframes blobReverse {
+        0% { transform: translate(0px, 0px) scale(1); }
+        33% { transform: translate(-400px, 300px) scale(0.9); }
+        66% { transform: translate(300px, -200px) scale(1.1); }
+        100% { transform: translate(0px, 0px) scale(1); }
+      }
+
+      @keyframes blobVertical {
+        0% { transform: translate(0px, 0px) scale(1); }
+        50% { transform: translate(100px, 500px) scale(1.2); }
+        100% { transform: translate(0px, 0px) scale(1); }
+      }
+
+      .login-card {
+        position: relative;
+        z-index: 2;
+        width: 360px;
+        max-width: calc(100vw - 48px);
+        padding: 28px;
+        border-radius: 20px;
+        background: rgba(17, 24, 39, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(24px);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+      }
+
+      .login-card h1 {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 6px;
+      }
+
+      .login-card p {
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 18px;
+      }
+
+      label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        color: var(--muted);
+      }
+
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(17, 24, 39, 0.7);
+        color: var(--text);
+        margin-bottom: 14px;
+      }
+
+      button {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: none;
+        font-weight: 700;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #030712;
+        cursor: pointer;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+      }
+
+      button:hover {
+        transform: translateY(-1px) scale(1.01);
+        box-shadow: 0 6px 20px rgba(0, 229, 255, 0.45);
+      }
+
+      .error {
+        margin-top: 12px;
+        font-size: 12px;
+        color: #fca5a5;
+      }
+    </style>
+  </head>
+  <body>
+    <div style="position: fixed; inset: 0; z-index: 0; background: #020617; overflow: hidden; pointer-events: none;">
+      <div class="blob" style="top: -10%; left: -10%; width: 500px; height: 500px; background: rgba(147, 51, 234, 0.4); animation: blob 25s infinite alternate;"></div>
+      <div class="blob" style="top: 20%; right: -10%; width: 400px; height: 400px; background: rgba(6, 182, 212, 0.4); animation: blobReverse 28s infinite alternate;"></div>
+      <div class="blob" style="bottom: -10%; left: 20%; width: 600px; height: 600px; background: rgba(59, 130, 246, 0.4); animation: blobVertical 32s infinite alternate;"></div>
+    </div>
+
+    <div class="login-card">
+      <h1>Web SSH Bastion</h1>
+      <p>Sign in to access your terminal workspace.</p>
+      <form id="loginForm">
+        <label for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required />
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <button type="submit">Sign In</button>
+        <div class="error" id="error"></div>
+      </form>
+    </div>
+
+    <script>
+      const form = document.getElementById('loginForm');
+      const error = document.getElementById('error');
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        error.textContent = '';
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value;
+
+        try {
+          const res = await fetch('/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password }),
+          });
+
+          if (!res.ok) {
+            const payload = await res.json().catch(() => ({}));
+            error.textContent = payload.error || 'Sign in failed.';
+            return;
+          }
+
+          window.location.href = '/';
+        } catch (err) {
+          error.textContent = 'Network error. Try again.';
+        }
+      });
+    </script>
+  </body>
+</html>
