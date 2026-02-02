@@ -1,5 +1,4 @@
 const WebSocket = require('ws');
-const MockSSHSession = require('./ssh/mock');
 const RealSSHSession = require('./ssh/real');
 const config = require('./config');
 const targetService = require('./proxmox');
@@ -17,12 +16,7 @@ class TerminalManager {
   createSession(target) {
     const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-    let session;
-    if (config.sshMode === 'mock') {
-      session = new MockSSHSession(target);
-    } else {
-      session = new RealSSHSession(config);
-    }
+    const session = new RealSSHSession(config);
 
     this.sessions.set(sessionId, session);
     return { sessionId, session };
@@ -104,10 +98,7 @@ class TerminalManager {
               this.removeSession(sessionId);
             });
 
-            // For real SSH, connect to target
-            if (config.sshMode === 'real') {
-              await session.connect(target);
-            }
+            await session.connect(target);
           } else if (msg.type === 'input') {
             // Send input to SSH session
             const { sessionId, data } = msg;

@@ -17,9 +17,9 @@ app.use(express.static(path.join(__dirname, '../../frontend')));
 app.get('/api/targets', async (req, res) => {
   try {
     const targets = await targetService.getTargets();
+    const safeTargets = Array.isArray(targets) ? targets : [];
     res.json({
-      mode: config.sshMode,
-      targets,
+      targets: safeTargets,
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -29,7 +29,6 @@ app.get('/api/targets', async (req, res) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
-    sshMode: config.sshMode,
     uptime: process.uptime(),
   });
 });
@@ -62,6 +61,7 @@ terminalManager.setupWebSocketServer(server);
 async function startServer() {
   await ensureProxmoxToken();
   const targets = await targetService.getTargets();
+  const safeTargets = Array.isArray(targets) ? targets : [];
   const PORT = config.port;
   const HOST = config.host;
 
@@ -71,12 +71,11 @@ async function startServer() {
 ║     Web SSH Bastion - Backend Server Started         ║
 ╚════════════════════════════════════════════════════════╝
 
-Mode:     ${config.sshMode}
 Host:     http://${HOST}:${PORT}
 WebSocket: ws://${HOST}:${PORT}
 
 Targets:
-${targets.map((t) => `  - ${t.name} (${t.host})`).join('\n')}
+${safeTargets.map((t) => `  - ${t.name} (${t.host})`).join('\n')}
 
 API Endpoints:
   - GET  /api/health       (server status)

@@ -1,12 +1,8 @@
-const config = require('../config');
-const mockClient = require('./mock');
 const realClient = require('./real');
 
 async function getTargets() {
-  if (config.sshMode === 'mock') {
-    return mockClient.fetchTargets(config.proxmoxToken);
-  }
-  return realClient.fetchTargets();
+  const targets = await realClient.fetchTargets();
+  return Array.isArray(targets) ? targets : [];
 }
 
 async function getTargetById(targetId) {

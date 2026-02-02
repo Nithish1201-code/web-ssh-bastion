@@ -72,10 +72,6 @@ function validatePort(value) {
   return true;
 }
 
-function validateSshMode(value) {
-  return ['mock', 'real'].includes(value) ? true : 'SSH mode must be mock or real.';
-}
-
 function validateBooleanFlag(value) {
   return ['0', '1'].includes(value) ? true : 'Use 0 or 1.';
 }
@@ -93,22 +89,20 @@ function validateUrl(value) {
 async function ensureEnvConfig() {
   const existing = readEnvFile();
   const defaults = {
-    SSH_MODE: existing.SSH_MODE || config.sshMode || 'mock',
     SSH_USER: existing.SSH_USER || config.sshUser || 'ubuntu',
     SSH_KEY_PATH: existing.SSH_KEY_PATH || config.sshKeyPath || '/keys/id_ed25519',
     SSH_PORT: existing.SSH_PORT || String(config.sshPort || 22),
     PORT: existing.PORT || String(config.port || 3000),
     HOST: existing.HOST || config.host || 'localhost',
-    PROXMOX_API_URL: existing.PROXMOX_API_URL || config.proxmoxApiUrl || '',
+    PROXMOX_API_URL: existing.PROXMOX_API_URL || config.proxmoxApiUrl || 'http://127.0.0.1:8006/api2/json',
     PROXMOX_API_TOKEN: existing.PROXMOX_API_TOKEN || '',
     PROXMOX_USER: existing.PROXMOX_USER || '',
-    PROXMOX_API_INSECURE: existing.PROXMOX_API_INSECURE || '0',
+    PROXMOX_API_INSECURE: existing.PROXMOX_API_INSECURE || '1',
     PROXMOX_NODE: existing.PROXMOX_NODE || '',
     SSH_TARGETS: existing.SSH_TARGETS || '[]',
   };
 
   const values = {
-    SSH_MODE: await askForValue('SSH mode (mock or real)', defaults.SSH_MODE, validateSshMode),
     SSH_USER: await askForValue('SSH user', defaults.SSH_USER, validateNonEmpty),
     SSH_KEY_PATH: await askForValue('SSH key path', defaults.SSH_KEY_PATH, validateNonEmpty),
     SSH_PORT: await askForValue('SSH port', defaults.SSH_PORT, validatePort),
@@ -138,10 +132,7 @@ async function ensureProxmoxToken() {
 
   const token = await askForValue('Proxmox API token', '');
   if (!token) {
-    if (config.sshMode === 'real') {
-      throw new Error('Missing Proxmox API token. Set PROXMOX_API_TOKEN in .env');
-    }
-    return '';
+    throw new Error('Missing Proxmox API token. Set PROXMOX_API_TOKEN in .env');
   }
 
   process.env.PROXMOX_API_TOKEN = token;
