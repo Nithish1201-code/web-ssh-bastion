@@ -10,7 +10,7 @@ const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 
 const app = express();
 const server = http.createServer(app);
-const sessions = new Map();
+const sessionSecret = process.env.WEB_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
 
 // Middleware
 app.use(express.json());
@@ -26,6 +26,24 @@ const parseCookies = (cookieHeader = '') =>
       acc[key] = rest.join('=');
       return acc;
     }, {});
+
+const signToken = (token) =>
+  crypto.createHmac('sha256', sessionSecret).update(token).digest('hex');
+
+const verifyToken = (token, sig) => {
+  if (!token || !sig) return false;
+  const expected = signToken(token);
+  try {
+    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
+  } catch (error) {
+    return false;
+  }
+};
+
+const buildSessionCookie = (token) => {
+  const sig = signToken(token);
+  return `webssh_session=${token}.${sig}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`;
+};
 
 const authEnabled = config.webAuthEnabled;
 
@@ -44,16 +62,12 @@ if (authEnabled) {
     }
 
     const token = crypto.randomBytes(24).toString('hex');
-    sessions.set(token, { createdAt: Date.now() });
-    res.setHeader('Set-Cookie', `webssh_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
+    res.setHeader('Set-Cookie', buildSessionCookie(token));
     return res.json({ ok: true, token });
   });
 
   app.post('/logout', (req, res) => {
     const cookies = parseCookies(req.headers.cookie || '');
-    if (cookies.webssh_session) {
-      sessions.delete(cookies.webssh_session);
-    }
     res.setHeader('Set-Cookie', 'webssh_session=; Max-Age=0; Path=/');
     return res.json({ ok: true });
   });
@@ -66,15 +80,17 @@ if (authEnabled) {
 
     if (req.query?.session) {
       const sessionToken = req.query.session;
-      if (sessions.has(sessionToken)) {
-        res.setHeader('Set-Cookie', `webssh_session=${sessionToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
-        return res.redirect('/');
-      }
+      res.setHeader('Set-Cookie', buildSessionCookie(sessionToken));
+      return res.redirect('/');
     }
 
     const cookies = parseCookies(req.headers.cookie || '');
-    const session = cookies.webssh_session && sessions.get(cookies.webssh_session);
-    if (session) return next();
+    if (cookies.webssh_session) {
+      const [token, sig] = cookies.webssh_session.split('.');
+      if (verifyToken(token, sig)) {
+        return next();
+      }
+    }
 
     if (req.path.startsWith('/api/')) {
       return res.status(401).json({ error: 'Authentication required' });
