@@ -51,6 +51,13 @@
             color: var(--text);
             letter-spacing: 0.01em;
             overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
+
+          ::selection {
+            background: rgba(0, 229, 255, 0.35);
+            color: #030712;
           }
 
           .app {
@@ -71,6 +78,19 @@
             overflow-y: auto;
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
+          }
+
+          .glass-panel {
+            background: rgba(17, 24, 39, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+          }
+
+          .glass-card {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
           }
 
           .brand {
@@ -322,13 +342,28 @@
 
           .session-tab .close {
             font-weight: 700;
-            opacity: 0.6;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+          }
+
+          .session-tab:hover .close {
+            opacity: 0.7;
           }
 
           .grid-stack {
             background: transparent;
             padding: 16px;
             flex: 1;
+          }
+
+          .grid-stack-item {
+            background: transparent;
+          }
+
+          .grid-stack-placeholder > .grid-stack-item-content {
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px dashed rgba(0, 229, 255, 0.25);
+            box-shadow: none;
           }
 
           .grid-stack-item-content {
@@ -425,7 +460,7 @@
           .terminal-surface {
             flex: 1;
             padding: 10px;
-            background: rgba(0, 0, 0, 0.55);
+            background: rgba(0, 0, 0, 0.35);
             backdrop-filter: blur(10px);
           }
 
@@ -566,6 +601,18 @@
             100% { transform: translate(0px, 0px) scale(1); }
           }
 
+          .blob {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(100px);
+            mix-blend-mode: screen;
+            will-change: transform;
+          }
+
+          .blob-1 { animation-delay: 0s; }
+          .blob-2 { animation-delay: -5s; }
+          .blob-3 { animation-delay: -10s; }
+
           .debug-entry strong {
             color: var(--text);
             font-weight: 600;
@@ -584,12 +631,12 @@
       </head>
       <body>
         <div class="fixed inset-0" style="position: fixed; inset: 0; z-index: 0; background: #020617; overflow: hidden; pointer-events: none;">
-          <div class="blob" style="top: -10%; left: -10%; width: 500px; height: 500px; background: rgba(147, 51, 234, 0.4); animation: blob 25s infinite alternate;"></div>
-          <div class="blob" style="top: 20%; right: -10%; width: 400px; height: 400px; background: rgba(6, 182, 212, 0.4); animation: blobReverse 28s infinite alternate; animation-delay: -5s;"></div>
-          <div class="blob" style="bottom: -10%; left: 20%; width: 600px; height: 600px; background: rgba(59, 130, 246, 0.4); animation: blobVertical 32s infinite alternate; animation-delay: -10s;"></div>
+          <div class="blob blob-1" style="top: -10%; left: -10%; width: 500px; height: 500px; background: rgba(147, 51, 234, 0.4); animation: blob 25s infinite alternate;"></div>
+          <div class="blob blob-2" style="top: 20%; right: -10%; width: 400px; height: 400px; background: rgba(6, 182, 212, 0.4); animation: blobReverse 28s infinite alternate;"></div>
+          <div class="blob blob-3" style="bottom: -10%; left: 20%; width: 600px; height: 600px; background: rgba(59, 130, 246, 0.4); animation: blobVertical 32s infinite alternate;"></div>
         </div>
         <div class="app">
-          <aside class="sidebar">
+          <aside class="sidebar glass-panel">
             <div class="brand">
               <h1>Web SSH Bastion</h1>
               <span>Multi-session control plane</span>
@@ -609,7 +656,7 @@
           </aside>
 
           <main class="workspace">
-            <div class="topbar">
+            <div class="topbar glass-panel">
               <div class="left">
                 <h2>Terminal Workspace</h2>
                 <span id="summaryText">Loading targets...</span>
