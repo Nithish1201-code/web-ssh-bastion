@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const { execSync } = require('child_process');
 const config = require('./config');
@@ -11,7 +12,49 @@ const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 const app = express();
 app.set('trust proxy', true);
 const server = http.createServer(app);
-const sessionSecret = process.env.WEB_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
+const ENV_PATH = path.join(__dirname, '../../.env');
+
+const readEnvValue = (content, key) => {
+  const lines = content.split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const [currentKey, ...rest] = trimmed.split('=');
+    if (currentKey === key && rest.length) {
+      return rest.join('=').trim();
+    }
+  }
+  return '';
+};
+
+const ensureWebAuthSecret = () => {
+  if (process.env.WEB_AUTH_SECRET) return process.env.WEB_AUTH_SECRET;
+
+  try {
+    if (fs.existsSync(ENV_PATH)) {
+      const envContent = fs.readFileSync(ENV_PATH, 'utf8');
+      const existing = readEnvValue(envContent, 'WEB_AUTH_SECRET');
+      if (existing) {
+        process.env.WEB_AUTH_SECRET = existing;
+        return existing;
+      }
+    }
+  } catch (error) {
+    // ignore env read errors
+  }
+
+  const generated = crypto.randomBytes(32).toString('hex');
+  process.env.WEB_AUTH_SECRET = generated;
+  try {
+    const prefix = fs.existsSync(ENV_PATH) ? '\n' : '';
+    fs.appendFileSync(ENV_PATH, `${prefix}WEB_AUTH_SECRET=${generated}\n`, 'utf8');
+  } catch (error) {
+    // ignore env write errors
+  }
+  return generated;
+};
+
+const sessionSecret = ensureWebAuthSecret();
 
 // Middleware
 app.use(express.json());
@@ -43,9 +86,12 @@ const verifyToken = (token, sig) => {
 
 const buildSessionCookie = (req, token) => {
   const sig = signToken(token);
-  const proto = req.headers['x-forwarded-proto'] || req.protocol;
-  const secure = proto === 'https' ? ' Secure;' : '';
-  const sameSite = proto === 'https' ? 'SameSite=None;' : 'SameSite=Lax;';
+  const forwarded = req.headers['x-forwarded-proto'];
+  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const proto = (forwardedValue || req.protocol || '').split(',')[0].trim().toLowerCase();
+  const isHttps = proto === 'https';
+  const secure = isHttps ? ' Secure;' : '';
+  const sameSite = isHttps ? 'SameSite=None;' : 'SameSite=Lax;';
   return `webssh_session=${token}.${sig}; HttpOnly; ${sameSite} Path=/; Max-Age=86400;${secure}`;
 };
 

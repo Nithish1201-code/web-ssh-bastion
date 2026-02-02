@@ -1,4 +1,9 @@
-const { Agent } = require('undici');
+let UndiciAgent;
+try {
+  ({ Agent: UndiciAgent } = require('undici'));
+} catch (error) {
+  UndiciAgent = null;
+}
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 const config = require('../config');
@@ -6,10 +11,10 @@ const config = require('../config');
 const execFileAsync = promisify(execFile);
 
 function getDispatcher() {
-  if (!config.proxmoxInsecure) {
+  if (!config.proxmoxInsecure || !UndiciAgent) {
     return undefined;
   }
-  return new Agent({
+  return new UndiciAgent({
     connect: {
       rejectUnauthorized: false,
     },
