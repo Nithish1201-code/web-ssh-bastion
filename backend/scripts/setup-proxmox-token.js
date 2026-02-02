@@ -1,9 +1,9 @@
-const { ensureProxmoxToken } = require('../src/setup/proxmoxToken');
+const { ensureEnvConfig } = require('../src/setup/proxmoxToken');
 
-ensureProxmoxToken()
+ensureEnvConfig()
   .then(() => {
-    console.log('Proxmox API token setup complete.');
+    console.log('Environment configuration complete.');
   })
   .catch((err) => {
-    console.error('Failed to ensure Proxmox token:', err);
+    console.error('Failed to configure environment:', err);
   });

@@ -1,515 +1,796 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Web SSH Bastion</title>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/xterm@5.0.0/css/xterm.min.css"
-    />
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-
-      body {
-        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-        background: #1e1e1e;
-        color: #d4d4d4;
-      }
-
-      .container {
-        display: flex;
-        height: 100vh;
-      }
-
-      .sidebar {
-        width: 250px;
-        background: #252526;
-        border-right: 1px solid #3e3e42;
-        padding: 20px;
-        overflow-y: auto;
-      }
-
-      .sidebar h2 {
-        font-size: 14px;
-        color: #858585;
-        text-transform: uppercase;
-        margin-bottom: 15px;
-        margin-top: 20px;
-      }
-
-      .sidebar h2:first-child {
-        margin-top: 0;
-      }
-
-      .target-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-
-      .target-card {
-        padding: 12px;
-        background: #1f1f23;
-        border-radius: 8px;
-        border: 1px solid #3f3f45;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-      }
-
-      .target-card__row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .target-card__name {
-        font-size: 14px;
-        font-weight: bold;
-        color: #ffffff;
-      }
-
-      .target-card__meta {
-        font-size: 11px;
-        color: #909090;
-        margin-top: 2px;
-      }
-
-      .target-card__actions {
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      .target-btn {
-        padding: 8px 12px;
-        background: #2d2d30;
-        border: 1px solid #3e3e42;
-        color: #cccccc;
-        cursor: pointer;
-        border-radius: 3px;
-        font-size: 12px;
-        transition: all 0.2s;
-      }
-
-      .target-btn:hover {
-        background: #3e3e42;
-        border-color: #007acc;
-        color: #ffffff;
-      }
-
-      .target-status {
-        padding: 4px 8px;
-        border-radius: 999px;
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.1em;
-      }
-
-      .target-status.running {
-        background: #0c3;
-        color: #0f0;
-      }
-
-      .target-status.stopped {
-        background: #4b1;
-        color: #f4b400;
-      }
-
-      .main {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .header {
-        background: #2d2d30;
-        border-bottom: 1px solid #3e3e42;
-        padding: 10px 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .header h1 {
-        font-size: 14px;
-        color: #cccccc;
-      }
-
-      .status {
-        font-size: 12px;
-        color: #858585;
-      }
-
-      .status.ready {
-        color: #4ec9b0;
-      }
-
-      .tabs {
-        background: #1e1e1e;
-        border-bottom: 1px solid #3e3e42;
-        display: flex;
-        gap: 0;
-        padding-left: 10px;
-        overflow-x: auto;
-      }
-
-      .tab {
-        padding: 10px 15px;
-        background: #2d2d30;
-        border: 1px solid #3e3e42;
-        border-bottom: none;
-        color: #858585;
-        cursor: pointer;
-        font-size: 12px;
-        border-radius: 3px 3px 0 0;
-        display: flex;
-        gap: 8px;
-        align-items: center;
-        white-space: nowrap;
-      }
-
-      .tab.active {
-        background: #1e1e1e;
-        color: #cccccc;
-        border: 1px solid #3e3e42;
-        border-bottom: 1px solid #1e1e1e;
-      }
-
-      .tab-close {
-        cursor: pointer;
-        opacity: 0.6;
-        font-weight: bold;
-      }
-
-      .tab-close:hover {
-        opacity: 1;
-      }
-
-      .terminal-container {
-        flex: 1;
-        overflow: hidden;
-        position: relative;
-        background: #1e1e1e;
-      }
-
-      .terminal {
-        height: 100%;
-        padding: 10px;
-      }
-
-      .xterm {
-        height: 100%;
-      }
-
-      .loading {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        height: 100%;
-        color: #858585;
-        font-size: 13px;
-      }
-
-      .error {
-        padding: 20px;
-        color: #f48771;
-        background: #1e1e1e;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="container">
-      <div class="sidebar">
-        <h2>Targets</h2>
-        <div class="target-list" id="targetList"></div>
-
-        <h2>Info</h2>
-        <div class="status" id="statusInfo">Loading...</div>
-      </div>
-
-      <div class="main">
-        <div class="header">
-          <h1>Web SSH Bastion</h1>
-          <div class="status" id="connectionStatus">Connecting...</div>
-        </div>
-
-        <div class="tabs" id="tabs"></div>
-
-        <div class="terminal-container" id="terminalContainer">
-          <div class="loading">Open a terminal to get started</div>
-        </div>
-      </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/xterm@5.0.0/lib/xterm.min.js"></script>
-    <script>
-      class TerminalApp {
-        constructor() {
-          this.terminals = new Map(); // sessionId -> { ws, term, element, target }
-          this.activeSessionId = null;
-          this.targets = [];
-          this.wsUrl = this.getWsUrl();
-          this.init();
-        }
-
-        getWsUrl() {
-          const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-          return `${protocol}//${window.location.host}`;
-        }
-
-        async init() {
-          await this.loadTargets();
-          this.renderTargets();
-          this.updateStatus();
-        }
-
-        async loadTargets() {
-          try {
-            const response = await fetch('/api/targets');
-            const data = await response.json();
-            this.targets = data.targets;
-            this.mode = data.mode;
-            const running = this.targets.filter((target) => target.status === 'running').length;
-            document.getElementById(
-              'statusInfo'
-            ).textContent = `Mode: ${this.mode} · Targets: ${this.targets.length} · Running: ${running}`;
-          } catch (err) {
-            console.error('Failed to load targets:', err);
-            document.getElementById('statusInfo').textContent =
-              'Error loading targets';
-          }
-        }
-
-        renderTargets() {
-          const list = document.getElementById('targetList');
-          if (!this.targets.length) {
-            list.innerHTML = '<div class="loading">No targets discovered yet.</div>';
-            return;
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Web SSH Bastion</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/xterm@5.5.0/css/xterm.min.css"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css"
+        />
+        <style>
+          :root {
+            color-scheme: dark;
+            --bg: #0b0f17;
+            --panel: #111827;
+            --panel-2: #0f172a;
+            --panel-3: #111827;
+            --border: #1f2937;
+            --text: #e5e7eb;
+            --muted: #9ca3af;
+            --accent: #38bdf8;
+            --accent-2: #8b5cf6;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
           }
 
-          list.innerHTML = this.targets
-            .map(
-              (target) => `
-            <div class="target-card">
-              <div class="target-card__row">
-                <div>
-                  <div class="target-card__name">${target.name}</div>
-                  <div class="target-card__meta">${target.ip} · ${target.os} · ${target.username}</div>
-                </div>
-                <span class="target-status ${target.status === 'running' ? 'running' : 'stopped'}">${target.status}</span>
-              </div>
-              <div class="target-card__actions">
-                <button
-                  class="target-btn"
-                  data-target-id="${target.id}"
-                  data-target-name="${target.name}"
-                  data-target-ip="${target.ip}"
-                >
-                  Open Terminal
-                </button>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+
+          body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+          }
+
+          .app {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 100vh;
+          }
+
+          .sidebar {
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+          }
+
+          .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .brand h1 {
+            font-size: 20px;
+            font-weight: 600;
+          }
+
+          .brand span {
+            font-size: 12px;
+            color: var(--muted);
+          }
+
+          .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent);
+            font-size: 12px;
+          }
+
+          .filters {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+
+          .filters input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            color: var(--text);
+          }
+
+          .filter-row {
+            display: flex;
+            gap: 8px;
+          }
+
+          .chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--panel-2);
+            font-size: 12px;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+          }
+
+          .chip.active {
+            border-color: var(--accent);
+            color: var(--accent);
+          }
+
+          .target-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+
+          .target-card {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+          }
+
+          .target-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+
+          .target-name {
+            font-weight: 600;
+            font-size: 14px;
+          }
+
+          .target-meta {
+            font-size: 12px;
+            color: var(--muted);
+          }
+
+          .badge {
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+          }
+
+          .badge.running {
+            background: rgba(34, 197, 94, 0.16);
+            color: var(--success);
+          }
+
+          .badge.stopped {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+          }
+
+          .badge.unknown {
+            background: rgba(148, 163, 184, 0.2);
+            color: var(--muted);
+          }
+
+          .target-actions {
+            display: flex;
+            gap: 8px;
+          }
+
+          .btn {
+            padding: 8px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--panel-3);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s ease;
+          }
+
+          .btn.primary {
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            border: none;
+            color: #0b0f17;
+            font-weight: 600;
+          }
+
+          .btn:hover {
+            transform: translateY(-1px);
+          }
+
+          .workspace {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+          }
+
+          .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 26px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(15, 23, 42, 0.9);
+            backdrop-filter: blur(12px);
+          }
+
+          .topbar .left {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
+
+          .topbar h2 {
+            font-size: 18px;
+            font-weight: 600;
+          }
+
+          .topbar span {
+            font-size: 12px;
+            color: var(--muted);
+          }
+
+          .topbar-actions {
+            display: flex;
+            gap: 10px;
+          }
+
+          .session-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            background: var(--panel-2);
+          }
+
+          .session-tab {
+            border: 1px solid transparent;
+            background: var(--panel-3);
+            color: var(--muted);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+          }
+
+          .session-tab.active {
+            border-color: var(--accent);
+            color: var(--text);
+          }
+
+          .session-tab .close {
+            font-weight: 700;
+            opacity: 0.6;
+          }
+
+          .grid-stack {
+            background: var(--bg);
+            padding: 16px;
+            flex: 1;
+          }
+
+          .grid-stack-item-content {
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+          }
+
+          .tile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: rgba(15, 23, 42, 0.8);
+            border-bottom: 1px solid var(--border);
+            cursor: move;
+          }
+
+          .tile-header h4 {
+            font-size: 13px;
+            font-weight: 600;
+          }
+
+          .tile-header span {
+            font-size: 11px;
+            color: var(--muted);
+          }
+
+          .tile-actions {
+            display: flex;
+            gap: 8px;
+          }
+
+          .tile-actions button {
+            background: transparent;
+            color: var(--muted);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+          }
+
+          .tile-actions button:hover {
+            color: var(--text);
+          }
+
+          .terminal-surface {
+            flex: 1;
+            padding: 10px;
+          }
+
+          .tile-active .grid-stack-item-content {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+          }
+
+          .empty-state {
+            padding: 28px;
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+          }
+
+          .toast {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--panel-2);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+          }
+
+          .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          @media (max-width: 1100px) {
+            .app {
+              grid-template-columns: 1fr;
+            }
+            .sidebar {
+              border-right: none;
+              border-bottom: 1px solid var(--border);
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="app">
+          <aside class="sidebar">
+            <div class="brand">
+              <h1>Web SSH Bastion</h1>
+              <span>Multi-session control plane</span>
+            </div>
+            <div class="status-pill" id="modePill">Loading...</div>
+
+            <div class="filters">
+              <input id="searchInput" placeholder="Search VM/CT by name or IP" />
+              <div class="filter-row">
+                <div class="chip active" data-filter="all">All</div>
+                <div class="chip" data-filter="ct">CT</div>
+                <div class="chip" data-filter="vm">VM</div>
               </div>
             </div>
-          `
-            )
-            .join('');
 
-          list.querySelectorAll('.target-btn').forEach((button) => {
-            button.addEventListener('click', () => {
-              this.openTerminal(
-                button.dataset.targetId,
-                button.dataset.targetName,
-                button.dataset.targetIp
+            <div class="target-list" id="targetList"></div>
+          </aside>
+
+          <main class="workspace">
+            <div class="topbar">
+              <div class="left">
+                <h2>Terminal Workspace</h2>
+                <span id="summaryText">Loading targets...</span>
+              </div>
+              <div class="topbar-actions">
+                <button class="btn" id="refreshBtn">Refresh Targets</button>
+                <button class="btn primary" id="newSessionBtn">New Terminal</button>
+              </div>
+            </div>
+
+            <div class="session-bar" id="sessionBar"></div>
+
+            <div class="grid-stack" id="grid">
+              <div class="empty-state" id="emptyState">
+                Select a target to launch terminals. Drag and resize tiles freely.
+              </div>
+            </div>
+          </main>
+        </div>
+
+        <div class="toast" id="toast"></div>
+
+        <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm@5.5.0/lib/xterm.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+        <script>
+          class TerminalApp {
+            constructor() {
+              this.targets = [];
+              this.terminals = new Map();
+              this.activeSessionId = null;
+              this.filterType = 'all';
+              this.wsUrl = this.getWsUrl();
+              this.grid = GridStack.init(
+                {
+                  margin: 10,
+                  float: true,
+                  cellHeight: 180,
+                  draggable: { handle: '.tile-header' },
+                  resizable: { handles: 'all' },
+                },
+                '#grid'
               );
-            });
-          });
-        }
 
-        openTerminal(targetId, targetName, targetIp) {
-          const sessionId = `terminal-${Date.now()}`;
-          const ws = new WebSocket(this.wsUrl);
-
-          ws.onopen = () => {
-            // Request to open terminal
-            ws.send(
-              JSON.stringify({
-                type: 'open',
-                targetId,
-                cols: 80,
-                rows: 24,
-              })
-            );
-          };
-
-          ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-
-            if (msg.type === 'ready') {
-              this.setActiveTerminal(sessionId);
-            } else if (msg.type === 'output') {
-              const term = this.terminals.get(sessionId)?.term;
-              if (term) {
-                term.write(msg.data);
-              }
-            } else if (msg.type === 'close') {
-              this.closeTerminal(sessionId);
-            } else if (msg.type === 'error') {
-              console.error('Terminal error:', msg.error);
-              const term = this.terminals.get(sessionId)?.term;
-              if (term) {
-                term.write(`\r\nError: ${msg.error}\r\n`);
-              }
-            }
-          };
-
-          ws.onerror = (err) => {
-            console.error('WebSocket error:', err);
-          };
-
-          ws.onclose = () => {
-            this.closeTerminal(sessionId);
-          };
-
-          // Create terminal
-          const term = new Terminal({
-            cols: 80,
-            rows: 24,
-            theme: {
-              background: '#1e1e1e',
-              foreground: '#d4d4d4',
-            },
-          });
-
-          const element = document.createElement('div');
-          element.className = 'terminal';
-          element.id = `terminal-${sessionId}`;
-
-          // Store terminal
-          this.terminals.set(sessionId, {
-            ws,
-            term,
-            element,
-            target: targetName,
-          });
-
-          // Add tab
-          this.addTab(sessionId, targetName, targetIp);
-
-          // Render terminal
-          this.renderTerminal(sessionId);
-
-          // Handle input
-          term.onData((data) => {
-            ws.send(
-              JSON.stringify({
-                type: 'input',
-                sessionId,
-                data,
-              })
-            );
-          });
-
-          // Handle resize
-          term.onResize(({ cols, rows }) => {
-            ws.send(
-              JSON.stringify({
-                type: 'resize',
-                sessionId,
-                cols,
-                rows,
-              })
-            );
-          });
-        }
-
-        addTab(sessionId, targetName, targetIp) {
-          const tabs = document.getElementById('tabs');
-          const tab = document.createElement('div');
-          tab.className = 'tab';
-          tab.id = `tab-${sessionId}`;
-          const label = targetIp ? `${targetName} (${targetIp})` : targetName;
-          tab.innerHTML = `
-            <span>${label}</span>
-            <span class="tab-close" onclick="app.closeTerminal('${sessionId}')">×</span>
-          `;
-          tab.onclick = () => this.setActiveTerminal(sessionId);
-          tabs.appendChild(tab);
-        }
-
-        setActiveTerminal(sessionId) {
-          // Update active state
-          if (this.activeSessionId) {
-            const oldTab = document.getElementById(`tab-${this.activeSessionId}`);
-            if (oldTab) oldTab.classList.remove('active');
-          }
-
-          this.activeSessionId = sessionId;
-          const tab = document.getElementById(`tab-${sessionId}`);
-          if (tab) tab.classList.add('active');
-
-          // Show terminal
-          this.renderTerminal(sessionId);
-        }
-
-        renderTerminal(sessionId) {
-          const container = document.getElementById('terminalContainer');
-          container.innerHTML = '';
-
-          const terminalData = this.terminals.get(sessionId);
-          if (terminalData) {
-            terminalData.element.innerHTML = '';
-            terminalData.term.open(terminalData.element);
-            terminalData.term.focus();
-            container.appendChild(terminalData.element);
-          }
-        }
-
-        closeTerminal(sessionId) {
-          const terminal = this.terminals.get(sessionId);
-          if (terminal) {
-            if (terminal.ws && terminal.ws.readyState === WebSocket.OPEN) {
-              terminal.ws.send(
-                JSON.stringify({
-                  type: 'close',
-                  sessionId,
-                })
-              );
-              terminal.ws.close();
+              this.bindUI();
+              this.init();
             }
 
-            terminal.term.dispose();
-            this.terminals.delete(sessionId);
+            getWsUrl() {
+              const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+              return `${protocol}//${window.location.host}`;
+            }
 
-            // Remove tab
-            const tab = document.getElementById(`tab-${sessionId}`);
-            if (tab) tab.remove();
+            bindUI() {
+              document.getElementById('refreshBtn').addEventListener('click', () => this.reload());
+              document.getElementById('newSessionBtn').addEventListener('click', () => {
+                if (this.targets.length) {
+                  this.openTerminal(this.targets[0]);
+                } else {
+                  this.toast('No targets available.');
+                }
+              });
 
-            // If was active, switch to another terminal
-            if (this.activeSessionId === sessionId) {
-              const remaining = Array.from(this.terminals.keys())[0];
-              if (remaining) {
-                this.setActiveTerminal(remaining);
-              } else {
-                this.activeSessionId = null;
-                document.getElementById('terminalContainer').innerHTML =
-                  '<div class="loading">Open a terminal to get started</div>';
+              document.getElementById('searchInput').addEventListener('input', () => this.renderTargets());
+
+              document.querySelectorAll('.chip').forEach((chip) => {
+                chip.addEventListener('click', () => {
+                  document.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+                  chip.classList.add('active');
+                  this.filterType = chip.dataset.filter;
+                  this.renderTargets();
+                });
+              });
+
+              this.grid.on('resizestop', (event, el) => {
+                const sessionId = el?.dataset?.sessionId;
+                if (sessionId) {
+                  const data = this.terminals.get(sessionId);
+                  data?.fitAddon?.fit();
+                  if (data?.ws?.readyState === WebSocket.OPEN) {
+                    data.ws.send(
+                      JSON.stringify({
+                        type: 'resize',
+                        sessionId,
+                        cols: data.term.cols,
+                        rows: data.term.rows,
+                      })
+                    );
+                  }
+                }
+              });
+            }
+
+            async init() {
+              await this.loadTargets();
+              this.renderTargets();
+              this.updateSummary();
+            }
+
+            async reload() {
+              await this.loadTargets();
+              this.renderTargets();
+              this.updateSummary();
+            }
+
+            async loadTargets() {
+              try {
+                const response = await fetch('/api/targets');
+                const data = await response.json();
+                this.targets = data.targets || [];
+                this.mode = data.mode || 'unknown';
+                const running = this.targets.filter((t) => t.status === 'running').length;
+                document.getElementById('modePill').textContent = `${this.mode} mode · ${running}/${this.targets.length} running`;
+              } catch (err) {
+                console.error('Failed to load targets:', err);
+                this.toast('Failed to load targets.');
               }
             }
+
+            updateSummary() {
+              const text = this.targets.length
+                ? `${this.targets.length} targets · ${this.terminals.size} active terminals`
+                : 'No targets discovered yet';
+              document.getElementById('summaryText').textContent = text;
+            }
+
+            renderTargets() {
+              const list = document.getElementById('targetList');
+              const query = document.getElementById('searchInput').value.toLowerCase();
+
+              const filtered = this.targets.filter((target) => {
+                const matchesQuery =
+                  target.name?.toLowerCase().includes(query) ||
+                  target.ip?.toLowerCase().includes(query) ||
+                  target.vmid?.toLowerCase().includes(query);
+                const matchesType = this.filterType === 'all' || target.type === this.filterType;
+                return matchesQuery && matchesType;
+              });
+
+              if (!filtered.length) {
+                list.innerHTML = '<div class="empty-state">No matching targets.</div>';
+                return;
+              }
+
+              list.innerHTML = filtered
+                .map(
+                  (target) => `
+                  <div class="target-card">
+                    <div class="target-header">
+                      <div>
+                        <div class="target-name">${target.name}</div>
+                        <div class="target-meta">${target.type.toUpperCase()} · ${target.node || 'node'} · ${target.vmid}</div>
+                      </div>
+                      <span class="badge ${target.status || 'unknown'}">${target.status || 'unknown'}</span>
+                    </div>
+                    <div class="target-meta">${target.ip || 'No IP'} · ${target.os || 'Unknown OS'} · ${target.username}</div>
+                    <div class="target-actions">
+                      <button class="btn" data-action="open" data-id="${target.id}">Open Terminal</button>
+                      <button class="btn" data-action="open-split" data-id="${target.id}">Open Split</button>
+                    </div>
+                  </div>
+                `
+                )
+                .join('');
+
+              list.querySelectorAll('button[data-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                  const target = this.targets.find((t) => t.id === button.dataset.id);
+                  if (!target) return;
+                  this.openTerminal(target);
+                });
+              });
+            }
+
+            openTerminal(target) {
+              if (!target.host) {
+                this.toast('Target has no reachable host/IP.');
+                return;
+              }
+
+              const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              const ws = new WebSocket(this.wsUrl);
+
+              ws.onopen = () => {
+                ws.send(
+                  JSON.stringify({
+                    type: 'open',
+                    targetId: target.id,
+                    cols: 80,
+                    rows: 24,
+                  })
+                );
+              };
+
+              ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                const session = this.terminals.get(sessionId);
+
+                if (!session) return;
+
+                if (msg.type === 'ready') {
+                  this.focusSession(sessionId);
+                } else if (msg.type === 'output') {
+                  session.term.write(msg.data);
+                } else if (msg.type === 'close') {
+                  this.closeTerminal(sessionId);
+                } else if (msg.type === 'error') {
+                  session.term.write(`\r\nError: ${msg.error}\r\n`);
+                }
+              };
+
+              ws.onclose = () => {
+                this.closeTerminal(sessionId);
+              };
+
+              const tile = document.createElement('div');
+              tile.className = 'grid-stack-item';
+              tile.dataset.sessionId = sessionId;
+              tile.innerHTML = `
+                <div class="grid-stack-item-content">
+                  <div class="tile-header">
+                    <div>
+                      <h4>${target.name}</h4>
+                      <span>${target.ip || target.host} · ${target.type.toUpperCase()}</span>
+                    </div>
+                    <div class="tile-actions">
+                      <button title="Focus" data-action="focus">⌖</button>
+                      <button title="Close" data-action="close">×</button>
+                    </div>
+                  </div>
+                  <div class="terminal-surface" id="terminal-${sessionId}"></div>
+                </div>
+              `;
+
+              this.grid.addWidget(tile, { w: 6, h: 4, minW: 3, minH: 2 });
+
+              tile.querySelector('[data-action="close"]').addEventListener('click', () => {
+                this.closeTerminal(sessionId);
+              });
+
+              tile.querySelector('[data-action="focus"]').addEventListener('click', () => {
+                this.focusSession(sessionId);
+              });
+
+              const terminalEl = tile.querySelector(`#terminal-${sessionId}`);
+              const term = new Terminal({
+                cursorBlink: true,
+                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                theme: {
+                  background: '#0b0f17',
+                  foreground: '#e5e7eb',
+                  cursor: '#38bdf8',
+                },
+              });
+
+              const fitAddon = new FitAddon.FitAddon();
+              term.loadAddon(fitAddon);
+              term.open(terminalEl);
+              fitAddon.fit();
+
+              const sendResize = () => {
+                if (ws.readyState === WebSocket.OPEN) {
+                  ws.send(
+                    JSON.stringify({
+                      type: 'resize',
+                      sessionId,
+                      cols: term.cols,
+                      rows: term.rows,
+                    })
+                  );
+                }
+              };
+
+              sendResize();
+
+              const observer = new ResizeObserver(() => {
+                fitAddon.fit();
+                sendResize();
+              });
+              observer.observe(terminalEl);
+
+              term.onData((data) => {
+                ws.send(
+                  JSON.stringify({
+                    type: 'input',
+                    sessionId,
+                    data,
+                  })
+                );
+              });
+
+              this.terminals.set(sessionId, {
+                ws,
+                term,
+                fitAddon,
+                tile,
+                target,
+                observer,
+              });
+
+              this.addSessionTab(sessionId, target);
+              this.hideEmptyState();
+              this.updateSummary();
+            }
+
+            addSessionTab(sessionId, target) {
+              const tab = document.createElement('div');
+              tab.className = 'session-tab';
+              tab.dataset.sessionId = sessionId;
+              tab.innerHTML = `
+                <span>${target.name}</span>
+                <span class="close">×</span>
+              `;
+
+              tab.addEventListener('click', (event) => {
+                if (event.target.classList.contains('close')) {
+                  this.closeTerminal(sessionId);
+                  return;
+                }
+                this.focusSession(sessionId);
+              });
+
+              document.getElementById('sessionBar').appendChild(tab);
+            }
+
+            focusSession(sessionId) {
+              if (this.activeSessionId && this.terminals.has(this.activeSessionId)) {
+                this.terminals.get(this.activeSessionId).tile.classList.remove('tile-active');
+                const oldTab = document.querySelector(`.session-tab[data-session-id="${this.activeSessionId}"]`);
+                oldTab?.classList.remove('active');
+              }
+
+              this.activeSessionId = sessionId;
+              const session = this.terminals.get(sessionId);
+              if (!session) return;
+
+              session.tile.classList.add('tile-active');
+              const tab = document.querySelector(`.session-tab[data-session-id="${sessionId}"]`);
+              tab?.classList.add('active');
+              session.tile.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              session.fitAddon.fit();
+            }
+
+            closeTerminal(sessionId) {
+              const session = this.terminals.get(sessionId);
+              if (!session) return;
+
+              if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+                session.ws.send(JSON.stringify({ type: 'close', sessionId }));
+                session.ws.close();
+              }
+
+              session.observer.disconnect();
+              session.term.dispose();
+              this.grid.removeWidget(session.tile);
+              this.terminals.delete(sessionId);
+
+              const tab = document.querySelector(`.session-tab[data-session-id="${sessionId}"]`);
+              tab?.remove();
+
+              if (this.activeSessionId === sessionId) {
+                const remaining = this.terminals.keys().next().value;
+                if (remaining) {
+                  this.focusSession(remaining);
+                } else {
+                  this.activeSessionId = null;
+                  this.showEmptyState();
+                }
+              }
+
+              this.updateSummary();
+            }
+
+            showEmptyState() {
+              document.getElementById('emptyState').style.display = 'block';
+            }
+
+            hideEmptyState() {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+
+            toast(message) {
+              const toast = document.getElementById('toast');
+              toast.textContent = message;
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            }
           }
-        }
 
-        updateStatus() {
-          const statusEl = document.getElementById('connectionStatus');
-          statusEl.textContent = 'Ready';
-          statusEl.classList.add('ready');
-        }
-      }
-
-      const app = new TerminalApp();
-    </script>
-  </body>
-</html>
+          const app = new TerminalApp();
+        </script>
+      </body>
+    </html>

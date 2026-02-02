@@ -1,5 +1,4 @@
 const { Client: SSHClient } = require('ssh2');
-const { spawn } = require('node-pty');
 const fs = require('fs');
 const { EventEmitter } = require('events');
 
@@ -13,7 +12,7 @@ class RealSSHSession extends EventEmitter {
     super();
     this.config = config;
     this.sshClient = null;
-    this.pty = null;
+    this.stream = null;
     this.connected = false;
   }
 
@@ -34,8 +33,28 @@ class RealSSHSession extends EventEmitter {
 
       this.sshClient.on('ready', () => {
         this.connected = true;
-        this.emit('ready');
-        resolve();
+        this.sshClient.shell(
+          {
+            term: 'xterm-256color',
+            cols: 80,
+            rows: 24,
+          },
+          (err, stream) => {
+            if (err) {
+              this.emit('error', err);
+              reject(err);
+              return;
+            }
+            this.stream = stream;
+            stream.on('data', (data) => this.emit('data', data));
+            stream.on('close', () => {
+              this.connected = false;
+              this.emit('close');
+            });
+            this.emit('ready');
+            resolve();
+          }
+        );
       });
 
       this.sshClient.on('error', (err) => {
@@ -53,19 +72,20 @@ class RealSSHSession extends EventEmitter {
   }
 
   write(data) {
-    if (!this.pty) return;
-    this.pty.write(data);
+    if (!this.stream) return;
+    this.stream.write(data);
   }
 
   resize(cols, rows) {
-    if (this.pty) {
-      this.pty.resize(cols, rows);
+    if (this.stream && this.stream.setWindow) {
+      this.stream.setWindow(rows, cols, rows * 14, cols * 7);
     }
   }
 
   end() {
-    if (this.pty) {
-      this.pty.destroy();
+    if (this.stream) {
+      this.stream.end();
+      this.stream = null;
     }
     if (this.sshClient) {
       this.sshClient.end();
