@@ -608,24 +608,51 @@
               this.authByTarget = new Map();
               this.debugOpen = false;
               this.wsUrl = this.getWsUrl();
-              this.grid = GridStack.init(
-                {
-                  margin: 10,
-                  float: true,
-                  cellHeight: 180,
-                  draggable: { handle: '.tile-header', cancel: '.tile-actions button, .traffic-lights, .traffic-lights span' },
-                  resizable: { handles: 'all' },
-                },
-                '#grid'
-              );
+              this.grid = this.createGrid();
 
               this.bindUI();
               this.init();
             }
 
+            createGrid() {
+              try {
+                if (!window.GridStack) {
+                  throw new Error('GridStack not available');
+                }
+                return GridStack.init(
+                  {
+                    margin: 10,
+                    float: true,
+                    cellHeight: 180,
+                    draggable: { handle: '.tile-header', cancel: '.tile-actions button, .traffic-lights, .traffic-lights span' },
+                    resizable: { handles: 'all' },
+                  },
+                  '#grid'
+                );
+              } catch (error) {
+                console.error('Grid init failed:', error);
+                const gridEl = document.getElementById('grid');
+                return {
+                  on: () => {},
+                  addWidget: (el) => {
+                    gridEl?.appendChild(el);
+                    return el;
+                  },
+                  removeWidget: (el) => {
+                    el?.remove();
+                  },
+                };
+              }
+            }
+
+            getWsUrl() {
+              const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+              return `${protocol}://${window.location.host}`;
+            }
+
             bindUI() {
-              document.getElementById('refreshBtn').addEventListener('click', () => this.reload());
-              document.getElementById('newSessionBtn').addEventListener('click', () => {
+              document.getElementById('refreshBtn')?.addEventListener('click', () => this.reload());
+              document.getElementById('newSessionBtn')?.addEventListener('click', () => {
                 if (this.targets.length) {
                   this.openTerminal(this.targets[0]);
                 } else {
@@ -633,11 +660,11 @@
                 }
               });
 
-              document.getElementById('debugToggleBtn').addEventListener('click', () => this.toggleDebug());
-              document.getElementById('debugCloseBtn').addEventListener('click', () => this.setDebug(false));
-              document.getElementById('debugClearBtn').addEventListener('click', () => this.clearDebug());
+              document.getElementById('debugToggleBtn')?.addEventListener('click', () => this.toggleDebug());
+              document.getElementById('debugCloseBtn')?.addEventListener('click', () => this.setDebug(false));
+              document.getElementById('debugClearBtn')?.addEventListener('click', () => this.clearDebug());
 
-              document.getElementById('searchInput').addEventListener('input', () => this.renderTargets());
+              document.getElementById('searchInput')?.addEventListener('input', () => this.renderTargets());
 
               document.querySelectorAll('.chip').forEach((chip) => {
                 chip.addEventListener('click', () => {
@@ -648,7 +675,7 @@
                 });
               });
 
-              this.grid.on('resizestop', (event, el) => {
+              this.grid?.on?.('resizestop', (event, el) => {
                 const sessionId = el?.dataset?.sessionId;
                 if (sessionId) {
                   const data = this.terminals.get(sessionId);
@@ -745,11 +772,15 @@
               const query = document.getElementById('searchInput').value.toLowerCase();
 
               const filtered = this.targets.filter((target) => {
+                const name = (target.name ?? '').toString();
+                const ip = (target.ip ?? target.host ?? '').toString();
+                const vmid = (target.vmid ?? '').toString();
                 const matchesQuery =
-                  target.name?.toLowerCase().includes(query) ||
-                  target.ip?.toLowerCase().includes(query) ||
-                  target.vmid?.toLowerCase().includes(query);
-                const matchesType = this.filterType === 'all' || target.type === this.filterType;
+                  name.toLowerCase().includes(query) ||
+                  ip.toLowerCase().includes(query) ||
+                  vmid.toLowerCase().includes(query);
+                const type = (target.type ?? 'unknown').toString();
+                const matchesType = this.filterType === 'all' || type === this.filterType;
                 return matchesQuery && matchesType;
               });
 
@@ -760,22 +791,32 @@
 
               list.innerHTML = filtered
                 .map(
-                  (target) => `
+                  (target) => {
+                    const type = (target.type ?? 'unknown').toString();
+                    const status = (target.status ?? 'unknown').toString();
+                    const name = (target.name ?? 'Unknown').toString();
+                    const node = (target.node ?? 'node').toString();
+                    const vmid = (target.vmid ?? '—').toString();
+                    const ip = (target.ip ?? 'No IP').toString();
+                    const os = (target.os ?? 'Unknown OS').toString();
+                    const username = (target.username ?? 'unknown').toString();
+                    return `
                   <div class="target-card">
                     <div class="target-header">
                       <div>
-                        <div class="target-name">${target.name}</div>
-                        <div class="target-meta">${target.type.toUpperCase()} · ${target.node || 'node'} · ${target.vmid}</div>
+                        <div class="target-name">${name}</div>
+                        <div class="target-meta">${type.toUpperCase()} · ${node} · ${vmid}</div>
                       </div>
-                      <span class="badge ${target.status || 'unknown'}">${target.status || 'unknown'}</span>
+                      <span class="badge ${status}">${status}</span>
                     </div>
-                    <div class="target-meta">${target.ip || 'No IP'} · ${target.os || 'Unknown OS'} · ${target.username}</div>
+                    <div class="target-meta">${ip} · ${os} · ${username}</div>
                     <div class="target-actions">
                       <button class="btn" data-action="open" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Terminal</button>
                       <button class="btn" data-action="open-split" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Split</button>
                     </div>
                   </div>
-                `
+                `;
+                  }
                 )
                 .join('');
 
@@ -1093,6 +1134,22 @@
               document.getElementById('emptyState').style.display = 'block';
             }
 
+            hideEmptyState() {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+
+            toast(message) {
+              const toast = document.getElementById('toast');
+              toast.textContent = message;
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+          }
+
+          const app = new TerminalApp();
+        </script>
+      </body>
+    </html>
             hideEmptyState() {
               document.getElementById('emptyState').style.display = 'none';
             }
