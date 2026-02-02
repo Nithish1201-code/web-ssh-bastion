@@ -46,7 +46,7 @@ if (authEnabled) {
     const token = crypto.randomBytes(24).toString('hex');
     sessions.set(token, { createdAt: Date.now() });
     res.setHeader('Set-Cookie', `webssh_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
-    return res.json({ ok: true });
+    return res.json({ ok: true, token });
   });
 
   app.post('/logout', (req, res) => {
@@ -61,6 +61,16 @@ if (authEnabled) {
   app.use((req, res, next) => {
     if (req.path === '/login') return next();
     if (req.path === '/login.html') return next();
+    if (req.path.startsWith('/vendor/')) return next();
+    if (req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.svg')) return next();
+
+    if (req.query?.session) {
+      const sessionToken = req.query.session;
+      if (sessions.has(sessionToken)) {
+        res.setHeader('Set-Cookie', `webssh_session=${sessionToken}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
+        return res.redirect('/');
+      }
+    }
 
     const cookies = parseCookies(req.headers.cookie || '');
     const session = cookies.webssh_session && sessions.get(cookies.webssh_session);

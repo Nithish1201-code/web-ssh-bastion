@@ -182,7 +182,11 @@
             error.textContent = payload.error || 'Sign in failed.';
             return;
           }
-
+          const payload = await res.json().catch(() => ({}));
+          if (payload.token) {
+            window.location.href = `/?session=${payload.token}`;
+            return;
+          }
           window.location.href = '/';
         } catch (err) {
           error.textContent = 'Network error. Try again.';
