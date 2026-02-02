@@ -45,7 +45,7 @@ if (authEnabled) {
 
     const token = crypto.randomBytes(24).toString('hex');
     sessions.set(token, { createdAt: Date.now() });
-    res.setHeader('Set-Cookie', `webssh_session=${token}; HttpOnly; SameSite=Lax; Path=/`);
+    res.setHeader('Set-Cookie', `webssh_session=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`);
     return res.json({ ok: true });
   });
 

@@ -27,7 +27,16 @@ function buildHeaders() {
 }
 
 function normalizeBaseUrl() {
-  return config.proxmoxApiUrl.replace(/\/$/, '');
+  const raw = config.proxmoxApiUrl.replace(/\/$/, '');
+  try {
+    const url = new URL(raw);
+    if (url.protocol === 'http:') {
+      url.protocol = 'https:';
+    }
+    return url.toString().replace(/\/$/, '');
+  } catch (error) {
+    return raw;
+  }
 }
 
 async function apiGet(pathname) {
