@@ -36,16 +36,30 @@ class TerminalManager {
   setupWebSocketServer(server) {
     const wss = new WebSocket.Server({ server });
 
+    const sendDebug = (ws, message, data = {}) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      ws.send(
+        JSON.stringify({
+          type: 'debug',
+          message,
+          data,
+        })
+      );
+    };
+
     wss.on('connection', (ws) => {
       console.log('WebSocket client connected');
+      sendDebug(ws, 'WebSocket connected');
 
       ws.on('message', async (message) => {
         try {
           const msg = JSON.parse(message);
           if (msg?.type && msg?.targetId) {
             console.log('[WS] Message', { type: msg.type, targetId: msg.targetId, sessionId: msg.sessionId });
+            sendDebug(ws, 'Message received', { type: msg.type, targetId: msg.targetId, sessionId: msg.sessionId });
           } else if (msg?.type) {
             console.log('[WS] Message', { type: msg.type, sessionId: msg.sessionId });
+            sendDebug(ws, 'Message received', { type: msg.type, sessionId: msg.sessionId });
           }
 
           if (msg.type === 'open') {
@@ -58,9 +72,17 @@ class TerminalManager {
               hasPassword: Boolean(password),
               acceptHostKey: Boolean(acceptHostKey),
             });
+            sendDebug(ws, 'Open terminal request', {
+              targetId,
+              cols,
+              rows,
+              hasPassword: Boolean(password),
+              acceptHostKey: Boolean(acceptHostKey),
+            });
             const target = await targetService.getTargetById(targetId);
             if (!target) {
               console.warn('[WS] Target not found', { targetId });
+              sendDebug(ws, 'Target not found', { targetId });
               ws.send(
                 JSON.stringify({
                   type: 'error',
@@ -72,12 +94,14 @@ class TerminalManager {
 
             const { sessionId, session } = this.createSession(target, preferredSessionId);
             console.log('[WS] Session created', { sessionId, targetId: target.id });
+            sendDebug(ws, 'Session created', { sessionId, targetId: target.id });
 
             this.wsConnections.set(ws, sessionId);
 
             // Set up event listeners
             session.on('ready', () => {
               if (ws.readyState !== WebSocket.OPEN) return;
+              sendDebug(ws, 'Session ready', { sessionId });
               ws.send(
                 JSON.stringify({
                   type: 'ready',
@@ -99,6 +123,7 @@ class TerminalManager {
 
             session.on('error', (err) => {
               if (ws.readyState !== WebSocket.OPEN) return;
+              sendDebug(ws, 'Session error', { sessionId, error: err.message, code: err.code });
               ws.send(
                 JSON.stringify({
                   type: 'error',
@@ -112,6 +137,7 @@ class TerminalManager {
 
             session.on('close', () => {
               if (ws.readyState === WebSocket.OPEN) {
+                sendDebug(ws, 'Session closed', { sessionId });
                 ws.send(
                   JSON.stringify({
                     type: 'close',
@@ -124,6 +150,7 @@ class TerminalManager {
 
             await session.connect(target, { password, acceptHostKey });
             console.log('[WS] Session connect resolved', { sessionId, targetId: target.id });
+            sendDebug(ws, 'Session connected', { sessionId, targetId: target.id });
           } else if (msg.type === 'input') {
             // Send input to SSH session
             const { sessionId, data } = msg;
@@ -146,6 +173,7 @@ class TerminalManager {
         } catch (err) {
           console.error('WebSocket message error:', err);
           console.error('[WS] Raw message:', message.toString());
+          sendDebug(ws, 'WebSocket message error', { error: err.message });
           ws.send(
             JSON.stringify({
               type: 'error',
@@ -157,6 +185,7 @@ class TerminalManager {
 
       ws.on('close', () => {
         console.log('WebSocket client disconnected');
+        sendDebug(ws, 'WebSocket disconnected');
         const sessionId = this.wsConnections.get(ws);
         if (sessionId) {
           console.log('[WS] Closing session from socket close', { sessionId });
