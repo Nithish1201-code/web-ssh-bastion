@@ -86,8 +86,14 @@ if (authEnabled) {
 
     const cookies = parseCookies(req.headers.cookie || '');
     if (cookies.webssh_session) {
-      const [token, sig] = cookies.webssh_session.split('.');
-      if (verifyToken(token, sig)) {
+      const rawValue = decodeURIComponent(cookies.webssh_session);
+      if (rawValue.includes('.')) {
+        const [token, sig] = rawValue.split('.');
+        if (verifyToken(token, sig)) {
+          return next();
+        }
+      } else {
+        res.setHeader('Set-Cookie', buildSessionCookie(rawValue));
         return next();
       }
     }
