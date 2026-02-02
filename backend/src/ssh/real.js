@@ -22,7 +22,14 @@ class RealSSHSession extends EventEmitter {
     return new Promise((resolve, reject) => {
       this.sshClient = new SSHClient();
 
-      const resolvedHost = target.ip || target.host;
+      const resolvedHost = target.ip;
+      if (!resolvedHost) {
+        const error = new Error('Target has no IP address.');
+        error.code = 'NO_IP';
+        this.emit('error', error);
+        reject(error);
+        return;
+      }
 
       const acceptHostKey = auth.acceptHostKey === true;
       const password = auth.password || '';
@@ -68,6 +75,9 @@ class RealSSHSession extends EventEmitter {
         port: this.config.sshPort,
         username: this.config.sshUser,
         hostVerifier,
+        keepaliveInterval: 10000,
+        keepaliveCountMax: 3,
+        readyTimeout: 20000,
         algorithms: {
           serverHostKey: ['ssh-ed25519', 'ecdsa-sha2-nistp256', 'ssh-rsa'],
         },

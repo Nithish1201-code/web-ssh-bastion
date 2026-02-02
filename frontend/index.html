@@ -859,8 +859,8 @@
                 this.toast('Target is offline.');
                 return;
               }
-              if (!target.host && !target.ip) {
-                this.toast('Target has no reachable host/IP.');
+              if (!target.ip) {
+                this.toast('Target has no IP address.');
                 return;
               }
 
