@@ -182,6 +182,7 @@
             error.textContent = payload.error || 'Sign in failed.';
             return;
           }
+          localStorage.setItem('authenticated', 'true');
           window.location.href = '/';
         } catch (err) {
           error.textContent = 'Network error. Try again.';

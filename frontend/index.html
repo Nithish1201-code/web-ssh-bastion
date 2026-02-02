@@ -718,6 +718,11 @@
         <script src="/vendor/xterm.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'"></script>
         <script src="/vendor/xterm-addon-fit.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js'"></script>
         <script>
+          // Check authentication
+          if (localStorage.getItem('authenticated') !== 'true') {
+            window.location.href = '/login.html';
+          }
+
           class TerminalApp {
             constructor() {
               this.targets = [];
