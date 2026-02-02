@@ -1,778 +1,1332 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Web SSH Bastion</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/vendor/xterm.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css'" />
-  <link rel="stylesheet" href="/vendor/gridstack.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css'" />
-  <style>
-    :root {
-      color-scheme: dark;
-      --bg: #09090b;
-      --panel: #18181b;
-      --panel-hover: #27272a;
-      --border: #27272a;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
-      --accent: #38bdf8;
-      --accent-hover: #0ea5e9;
-      --success: #10b981;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-    }
+  <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Web SSH Bastion</title>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          rel="stylesheet"
+          href="/vendor/xterm.css"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css'"
+        />
+        <link
+          rel="stylesheet"
+          href="/vendor/gridstack.min.css"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css'"
+        />
+        <style>
+          :root {
+            color-scheme: dark;
+            --bg: #030712;
+            --panel: rgba(17, 24, 39, 0.4);
+            --panel-2: rgba(31, 41, 55, 0.45);
+            --panel-3: rgba(31, 41, 55, 0.6);
+            --border: rgba(255, 255, 255, 0.08);
+            --text: #f8fafc;
+            --muted: #94a3b8;
+            --accent: #00e5ff;
+            --accent-2: #06b6d4;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --glass: rgba(17, 24, 39, 0.4);
+            --glow: 0 0 5px rgba(0, 229, 255, 0.2), 0 0 20px rgba(0, 229, 255, 0.1);
+          }
 
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
 
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      height: 100vh;
-      overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
+          body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+            background: #030712;
+            color: var(--text);
+            letter-spacing: 0.01em;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+          }
 
-    /* Scrollbars */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 999px; }
-    ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+          ::selection {
+            background: rgba(0, 229, 255, 0.35);
+            color: #030712;
+          }
 
-    .app {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      height: 100vh;
-    }
+          .app {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            min-height: 100vh;
+            position: relative;
+            z-index: 1;
+          }
 
-    /* Sidebar */
-    .sidebar {
-      background: var(--panel);
-      border-right: 1px solid var(--border);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+          .sidebar {
+            background: var(--panel);
+            border-right: 1px solid var(--border);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            overflow-y: auto;
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+          }
 
-    .sidebar-header {
-      padding: 20px 16px;
-      border-bottom: 1px solid var(--border);
-    }
+          .glass-panel {
+            background: rgba(17, 24, 39, 0.4);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+          }
 
-    .brand {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+          .glass-card {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+          }
 
-    .brand h1 {
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--text);
-      letter-spacing: -0.02em;
-    }
+          .brand {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
 
-    .brand span {
-      font-size: 12px;
-      color: var(--muted);
-    }
+          .brand h1 {
+            font-size: 20px;
+            font-weight: 700;
+          }
 
-    .sidebar-content {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-    }
+          .brand span {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 500;
+          }
 
-    /* Search & Filters */
-    .search-box {
-      position: relative;
-    }
+          .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            background: rgba(0, 229, 255, 0.16);
+            color: var(--accent);
+            font-size: 12px;
+            border: 1px solid rgba(0, 229, 255, 0.25);
+          }
 
-    .search-input {
-      width: 100%;
-      background: #09090b;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 12px 8px 32px;
-      color: var(--text);
-      font-size: 13px;
-      transition: border-color 0.2s;
-    }
+          .filters {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
 
-    .search-input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
+          .filters input {
+            width: 100%;
+            padding: 11px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(17, 24, 39, 0.6);
+            color: var(--text);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+          }
 
-    .search-icon {
-      position: absolute;
-      left: 10px;
-      top: 50%;
-      transform: translateY(-50%);
-      width: 14px;
-      height: 14px;
-      color: var(--muted);
-      pointer-events: none;
-    }
+          .filter-row {
+            display: flex;
+            gap: 8px;
+          }
 
-    .filter-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 4px;
-    }
+          .chip {
+            padding: 6px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: rgba(17, 24, 39, 0.5);
+            font-size: 12px;
+            color: var(--muted);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s ease;
+          }
 
-    .chip {
-      font-size: 11px;
-      font-weight: 500;
-      padding: 4px 10px;
-      border-radius: 999px;
-      background: var(--panel-hover);
-      color: var(--muted);
-      cursor: pointer;
-      transition: all 0.2s;
-      border: 1px solid transparent;
-    }
+          .chip.active {
+            border-color: var(--accent);
+            color: var(--accent);
+          }
 
-    .chip:hover {
-      color: var(--text);
-      background: #3f3f46;
-    }
+          .target-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
 
-    .chip.active {
-      background: rgba(56, 189, 248, 0.1);
-      color: var(--accent);
-      border-color: rgba(56, 189, 248, 0.2);
-    }
+          .target-card {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(20px);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          }
 
-    /* Target List */
-    .target-list {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+          .target-card:hover {
+            border-color: rgba(0, 229, 255, 0.3);
+            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.5);
+            transform: translateY(-2px);
+          }
 
-    .target-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 12px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.2s;
-      background: transparent;
-      border: 1px solid transparent;
-    }
+          .target-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
 
-    .target-item:hover {
-      background: var(--panel-hover);
-    }
+          .target-name {
+            font-weight: 700;
+            font-size: 14px;
+          }
 
-    .target-info {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-width: 0;
-    }
+          .target-meta {
+            font-size: 12px;
+            color: var(--muted);
+          }
 
-    .target-icon {
-      width: 32px;
-      height: 32px;
-      border-radius: 6px;
-      background: #27272a;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      flex-shrink: 0;
-    }
+          .target-actions .btn {
+            padding: 6px 10px;
+            background: rgba(17, 24, 39, 0.7);
+            font-size: 11px;
+            text-transform: none;
+            letter-spacing: 0.02em;
+            font-weight: 600;
+          }
 
-    .target-details {
-      min-width: 0;
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
+          .badge.running {
+            background: rgba(34, 197, 94, 0.16);
+            color: var(--success);
+          }
 
-    .target-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+          .badge.stopped {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--warning);
+          }
 
-    .target-sub {
-      font-size: 11px;
-      color: var(--muted);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
+          .badge.unknown {
+            background: rgba(148, 163, 184, 0.2);
+            color: var(--muted);
+          }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #3f3f46;
-      flex-shrink: 0;
-    }
+          .target-actions {
+            display: flex;
+            gap: 8px;
+          }
 
-    .status-dot.running { background: var(--success); box-shadow: 0 0 8px rgba(16, 185, 129, 0.4); }
-    .status-dot.stopped { background: var(--danger); box-shadow: 0 0 8px rgba(239, 68, 68, 0.4); }
+          .btn {
+            padding: 8px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: rgba(17, 24, 39, 0.6);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+          }
 
-    /* Main Workspace */
-    .workspace {
-      display: flex;
-      flex-direction: column;
-      background: #09090b;
-      position: relative;
-    }
+          .btn.primary {
+            background: linear-gradient(135deg, #00e5ff 0%, #06b6d4 100%);
+            border: none;
+            color: #030712;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+          }
 
-    .bg-grid {
-      position: absolute;
-      inset: 0;
-      background-image: 
-        linear-gradient(to right, #18181b 1px, transparent 1px),
-        linear-gradient(to bottom, #18181b 1px, transparent 1px);
-      background-size: 40px 40px;
-      opacity: 0.3;
-      pointer-events: none;
-      z-index: 0;
-      mask-image: radial-gradient(circle at center, black 40%, transparent 100%);
-    }
+          .btn.primary:hover {
+            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
+            transform: scale(1.02);
+          }
 
-    .topbar {
-      height: 56px;
-      border-bottom: 1px solid var(--border);
-      background: rgba(9, 9, 11, 0.8);
-      backdrop-filter: blur(12px);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      z-index: 10;
-    }
+          .icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+          }
 
-    .tabs-area {
-      display: flex;
-      gap: 6px;
-      overflow-x: auto;
-      align-items: center;
-      flex: 1;
-      margin-right: 20px;
-    }
+          .icon svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor;
+          }
 
-    .tab {
-      height: 32px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 0 12px;
-      font-size: 12px;
-      color: var(--muted);
-      background: #18181b;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-      user-select: none;
-      min-width: 120px;
-      max-width: 200px;
-    }
+          .btn:hover {
+            transform: translateY(-1px);
+          }
 
-    .tab:hover {
-      background: #27272a;
-      color: var(--text);
-    }
+          .workspace {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+          }
 
-    .tab.active {
-      background: #27272a;
-      color: var(--text);
-      border-color: var(--accent);
-    }
+          .topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 26px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(3, 7, 18, 0.6);
+            backdrop-filter: blur(16px);
+          }
 
-    .tab-close {
-      margin-left: auto;
-      opacity: 0;
-      transition: opacity 0.2s;
-      font-size: 16px;
-      line-height: 1;
-    }
+          .topbar .left {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+          }
 
-    .tab:hover .tab-close { opacity: 0.7; }
-    .tab-close:hover { opacity: 1; color: var(--danger); }
+          .topbar h2 {
+            font-size: 18px;
+            font-weight: 700;
+          }
 
-    .actions {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-    }
+          .topbar span {
+            font-size: 12px;
+            color: var(--muted);
+            font-weight: 500;
+          }
 
-    .btn {
-      height: 32px;
-      padding: 0 12px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #18181b;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
+          .topbar-actions {
+            display: flex;
+            gap: 10px;
+          }
 
-    .btn:hover {
-      background: #27272a;
-      border-color: #52525b;
-    }
+          .session-bar {
+            display: flex;
+            gap: 8px;
+            padding: 12px 18px;
+            border-bottom: 1px solid var(--border);
+            overflow-x: auto;
+            background: rgba(17, 24, 39, 0.5);
+          }
 
-    /* Terminal Grid */
-    .grid-stack {
-      z-index: 1;
-      padding: 20px;
-      flex: 1;
-      overflow-y: auto;
-    }
+          .session-tab {
+            border: 1px solid transparent;
+            background: rgba(17, 24, 39, 0.6);
+            color: var(--muted);
+            padding: 8px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+          }
 
-    .grid-stack-item-content {
-      background: #000;
-      border: 1px solid #333;
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-    }
+          .session-tab.active {
+            border-color: var(--accent);
+            color: var(--text);
+          }
 
-    .term-header {
-      height: 32px;
-      background: #18181b;
-      border-bottom: 1px solid #333;
-      display: flex;
-      align-items: center;
-      padding: 0 12px;
-      cursor: grab;
-    }
+          .session-tab .close {
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+          }
 
-    .term-header:active { cursor: grabbing; }
+          .session-tab:hover .close {
+            opacity: 0.7;
+          }
 
-    .term-title {
-      font-size: 12px;
-      color: #d4d4d8;
-      font-family: monospace;
-      margin-left: 12px;
-      opacity: 0.9;
-    }
+          .grid-stack {
+            background: transparent;
+            padding: 16px;
+            flex: 1;
+          }
 
-    .term-lights {
-      display: flex;
-      gap: 6px;
-    }
+          .grid-stack-item {
+            background: transparent;
+          }
 
-    .light { width: 10px; height: 10px; border-radius: 50%; }
-    .light.red { background: #ef4444; }
-    .light.yellow { background: #f59e0b; }
-    .light.green { background: #10b981; }
+          .grid-stack-placeholder > .grid-stack-item-content {
+            background: rgba(0, 229, 255, 0.08);
+            border: 1px dashed rgba(0, 229, 255, 0.25);
+            box-shadow: none;
+          }
 
-    .term-body {
-      flex: 1;
-      padding: 8px;
-      background: #000;
-    }
+          .grid-stack-item-content {
+            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            backdrop-filter: blur(20px);
+          }
 
-    /* Empty State */
-    .empty-state {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      color: var(--muted);
-      pointer-events: none;
-      z-index: 0;
-    }
+          .tile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 14px;
+            background: rgba(10, 10, 10, 0.55);
+            border-bottom: 1px solid var(--border);
+            cursor: grab;
+            backdrop-filter: blur(12px);
+          }
 
-    .empty-icon {
-      width: 64px;
-      height: 64px;
-      color: #27272a;
-      margin-bottom: 20px;
-    }
+          .tile-header:active {
+            cursor: grabbing;
+          }
 
-    .empty-text {
-      font-size: 14px;
-      color: #52525b;
-      margin-top: 10px;
-    }
+          .traffic-lights {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 8px;
+          }
 
-    /* Toast */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      background: #18181b;
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 12px 16px;
-      border-radius: 8px;
-      box-shadow: var(--shadow);
-      font-size: 13px;
-      z-index: 100;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.2s;
-    }
-    .toast.show { opacity: 1; transform: translateY(0); }
+          .traffic-lights span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+          }
 
-    @media (max-width: 768px) {
-      .app { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-    }
-  </style>
-  <script>
-    // Auth Check
-    if (localStorage.getItem('authenticated') !== 'true') {
-      window.location.href = '/login.html';
-    }
-  </script>
-</head>
-<body>
-  <div class="app">
-    <div class="sidebar">
-      <div class="sidebar-header">
-        <div class="brand">
-          <h1>Bastion</h1>
-          <span>Secure Gateway</span>
+          .traffic-lights .close {
+            background: #ff5f57;
+          }
+
+          .traffic-lights .min {
+            background: #febc2e;
+          }
+
+          .traffic-lights .max {
+            background: #28c840;
+          }
+
+          .tile-header h4 {
+            font-size: 13px;
+            font-weight: 700;
+          }
+
+          .tile-header span {
+            font-size: 11px;
+            color: var(--muted);
+            font-weight: 500;
+          }
+
+          .tile-actions {
+            display: flex;
+            gap: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s ease;
+          }
+
+          .grid-stack-item:hover .tile-actions {
+            opacity: 1;
+            pointer-events: auto;
+          }
+
+          .tile-actions button {
+            background: transparent;
+            color: var(--muted);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px;
+            border-radius: 8px;
+          }
+
+          .tile-actions button:hover {
+            color: var(--text);
+          }
+
+          .terminal-surface {
+            flex: 1;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.35);
+            backdrop-filter: blur(10px);
+          }
+
+          .terminal-surface .xterm,
+          .terminal-surface .xterm-viewport,
+          .terminal-surface .xterm-screen {
+            background: transparent;
+          }
+
+          .terminal-surface .xterm,
+          .terminal-surface .xterm-viewport,
+          .terminal-surface .xterm-screen {
+            height: 100%;
+          }
+
+          .tile-active .grid-stack-item-content {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(100, 210, 255, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45);
+          }
+
+          .empty-state {
+            padding: 28px;
+            color: var(--muted);
+            font-size: 14px;
+            text-align: center;
+          }
+
+          .toast {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 12px;
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.2s ease;
+          }
+
+          .toast.show {
+            opacity: 1;
+            transform: translateY(0);
+          }
+
+          .btn[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+          }
+
+          .debug-panel {
+            position: fixed;
+            right: 24px;
+            bottom: 24px;
+            width: 360px;
+            max-width: calc(100vw - 48px);
+            max-height: 320px;
+            background: rgba(17, 24, 39, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 14px;
+            box-shadow: var(--glow);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            transform: translateY(16px);
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.2s ease;
+          }
+
+          .debug-panel.show {
+            transform: translateY(0);
+            opacity: 1;
+            pointer-events: auto;
+          }
+
+          .debug-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            background: rgba(17, 24, 39, 0.7);
+          }
+
+          .debug-header h4 {
+            font-size: 12px;
+            font-weight: 600;
+          }
+
+          .debug-actions {
+            display: flex;
+            gap: 8px;
+          }
+
+          .debug-log {
+            padding: 10px 12px;
+            font-size: 11px;
+            color: var(--muted);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+          }
+
+          .debug-entry {
+            padding: 8px;
+            border-radius: 10px;
+            background: rgba(31, 41, 55, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+          }
+
+          ::-webkit-scrollbar { width: 4px; height: 4px; }
+          ::-webkit-scrollbar-track { background: transparent; }
+          ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.05); border-radius: 10px; }
+          ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.15); }
+
+          @keyframes blob {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(400px, -300px) scale(1.2); }
+            66% { transform: translate(-200px, 300px) scale(0.8); }
+            100% { transform: translate(0px, 0px) scale(1); }
+          }
+
+          @keyframes blobReverse {
+            0% { transform: translate(0px, 0px) scale(1); }
+            33% { transform: translate(-400px, 300px) scale(0.9); }
+            66% { transform: translate(300px, -200px) scale(1.1); }
+            100% { transform: translate(0px, 0px) scale(1); }
+          }
+
+          @keyframes blobVertical {
+            0% { transform: translate(0px, 0px) scale(1); }
+            50% { transform: translate(100px, 500px) scale(1.2); }
+            100% { transform: translate(0px, 0px) scale(1); }
+          }
+
+          .blob {
+            position: absolute;
+            border-radius: 999px;
+            filter: blur(100px);
+            mix-blend-mode: screen;
+            will-change: transform;
+          }
+
+          .blob-1 { animation-delay: 0s; }
+          .blob-2 { animation-delay: -5s; }
+          .blob-3 { animation-delay: -10s; }
+
+          .debug-entry strong {
+            color: var(--text);
+            font-weight: 600;
+          }
+
+          @media (max-width: 1100px) {
+            .app {
+              grid-template-columns: 1fr;
+            }
+            .sidebar {
+              border-right: none;
+              border-bottom: 1px solid var(--border);
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="fixed inset-0" style="position: fixed; inset: 0; z-index: 0; background: #020617; overflow: hidden; pointer-events: none;">
+          <div class="blob blob-1" style="top: -10%; left: -10%; width: 500px; height: 500px; background: rgba(147, 51, 234, 0.4); animation: blob 25s infinite alternate;"></div>
+          <div class="blob blob-2" style="top: 20%; right: -10%; width: 400px; height: 400px; background: rgba(6, 182, 212, 0.4); animation: blobReverse 28s infinite alternate;"></div>
+          <div class="blob blob-3" style="bottom: -10%; left: 20%; width: 600px; height: 600px; background: rgba(59, 130, 246, 0.4); animation: blobVertical 32s infinite alternate;"></div>
         </div>
-      </div>
-      <div class="sidebar-content">
-        <div class="search-box">
-          <svg class="search-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
-          </svg>
-          <input type="text" class="search-input" id="searchInput" placeholder="Search targets..." />
-        </div>
-        <div class="filter-row">
-          <div class="chip active" data-filter="all">All</div>
-          <div class="chip" data-filter="qemu">VM</div>
-          <div class="chip" data-filter="lxc">CT</div>
-        </div>
-        <div class="target-list" id="targetList">
-          <!-- Populated by JS -->
-        </div>
-      </div>
-    </div>
+        <div class="app">
+          <aside class="sidebar glass-panel">
+            <div class="brand">
+              <h1>Web SSH Bastion</h1>
+              <span>Multi-session control plane</span>
+            </div>
+            <div class="status-pill" id="modePill">Loading...</div>
 
-    <div class="workspace">
-      <div class="bg-grid"></div>
-      <div class="topbar">
-        <div class="tabs-area" id="tabsArea">
-          <!-- Populated by JS -->
-        </div>
-        <div class="actions">
-          <button class="btn" id="refreshBtn">
-            <svg style="width:14px;height:14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-            </svg>
-            Refresh
-          </button>
-          <button class="btn" id="logoutBtn">Logout</button>
-        </div>
-      </div>
-
-      <div class="grid-stack" id="grid"></div>
-
-      <div class="empty-state" id="emptyState">
-        <svg class="empty-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-        </svg>
-        <div class="empty-text">Select a target to launch terminal</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="toast" id="toast"></div>
-
-  <script src="/vendor/gridstack-all.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js'"></script>
-  <script src="/vendor/xterm.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'"></script>
-  <script src="/vendor/xterm-addon-fit.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js'"></script>
-  <script>
-    class BastionApp {
-      constructor() {
-        this.targets = [];
-        this.terminals = new Map();
-        this.activeSessionId = null;
-        this.filter = 'all';
-        this.wsUrl = window.location.protocol === 'https:' ? 'wss://' : 'ws://' + window.location.host;
-        this.grid = null;
-
-        this.initGrid();
-        this.bindEvents();
-        this.loadTargets();
-      }
-
-      initGrid() {
-        if (window.GridStack) {
-          this.grid = GridStack.init({
-            margin: 10,
-            float: true,
-            cellHeight: 180,
-            draggable: { handle: '.term-header' }, // handle for drag
-            resizable: { handles: 'se' } // corner resize
-          }, '#grid');
-          
-          this.grid.on('resizestop', (e, el) => {
-            const sid = el.dataset.sessionId;
-            this.resizeTerminal(sid);
-          });
-        }
-      }
-
-      bindEvents() {
-        document.getElementById('logoutBtn').addEventListener('click', () => {
-          localStorage.removeItem('authenticated');
-          window.location.href = '/login.html';
-        });
-
-        document.getElementById('refreshBtn').addEventListener('click', () => this.loadTargets());
-
-        document.getElementById('searchInput').addEventListener('input', (e) => {
-          this.renderTargets(e.target.value);
-        });
-
-        document.querySelectorAll('.chip').forEach(chip => {
-          chip.addEventListener('click', () => {
-             document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
-             chip.classList.add('active');
-             this.filter = chip.dataset.filter;
-             this.renderTargets(document.getElementById('searchInput').value);
-          });
-        });
-      }
-
-      async loadTargets() {
-        try {
-          const res = await fetch('/api/targets');
-          const data = await res.json();
-          this.targets = data.targets || [];
-          this.renderTargets();
-        } catch (err) {
-          console.error(err);
-          this.showToast('Failed to load targets');
-        }
-      }
-
-      renderTargets(query = '') {
-        const list = document.getElementById('targetList');
-        list.innerHTML = '';
-        const q = query.toLowerCase();
-
-        const filtered = this.targets.filter(t => {
-           if (this.filter !== 'all' && this.filter !== t.type) return false;
-           return (t.name || '').toLowerCase().includes(q) || (t.vmid || '').toString().includes(q);
-        });
-
-        filtered.forEach(t => {
-          const item = document.createElement('div');
-          item.className = 'target-item';
-          const isRunning = t.status === 'running';
-          
-          item.innerHTML = `
-            <div class="target-info">
-              <div class="target-icon">
-                <svg style="width:16px;height:16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M12 5l7 7-7 7"></path>
-                </svg>
-              </div>
-              <div class="target-details">
-                <div class="target-name">${t.name}</div>
-                <div class="target-sub">${t.vmid} · ${(t.type || 'v').toUpperCase()}</div>
+            <div class="filters">
+              <input id="searchInput" placeholder="Search VM/CT by name or IP" />
+              <div class="filter-row">
+                <div class="chip active" data-filter="all">All</div>
+                <div class="chip" data-filter="ct">CT</div>
+                <div class="chip" data-filter="vm">VM</div>
               </div>
             </div>
-            <div class="status-dot ${isRunning ? 'running' : 'stopped'}" title="${t.status}"></div>
-          `;
 
-          if (isRunning) {
-            item.addEventListener('click', () => this.openSession(t));
-          } else {
-            item.style.opacity = '0.5';
-            item.style.cursor = 'not-allowed';
-          }
-          list.appendChild(item);
-        });
-      }
+            <div class="target-list" id="targetList"></div>
+          </aside>
 
-      async openSession(target) {
-        // Simple mock password prompt for now, or assume agent has logic
-        // For real backend, we need the password.
-        // Let's ask.
-        const password = prompt(`Enter credentials for ${target.name}`);
-        if (!password) return;
+          <main class="workspace">
+            <div class="topbar glass-panel">
+              <div class="left">
+                <h2>Terminal Workspace</h2>
+                <span id="summaryText">Loading targets...</span>
+                <span id="buildText">Build: 69420</span>
+              </div>
+              <div class="topbar-actions">
+                <button class="btn" id="refreshBtn">
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M12 5a7 7 0 0 1 6.54 4.5h-2.1a5 5 0 1 0 0 5h2.1A7 7 0 1 1 12 5Zm7 0V2l3 3-3 3V5Z"
+                      />
+                    </svg>
+                  </span>
+                  Refresh Targets
+                </button>
+                <button class="btn primary" id="newSessionBtn">
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M11 5h2v14h-2zM5 11h14v2H5z" />
+                    </svg>
+                  </span>
+                  New Terminal
+                </button>
+                <button class="btn" id="debugToggleBtn">
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M11 2h2v3h-2zM4 11h3v2H4zM17 11h3v2h-3zM6.2 6.2l1.4-1.4 2.1 2.1-1.4 1.4zM14.3 14.3l1.4-1.4 2.1 2.1-1.4 1.4zM12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z" />
+                    </svg>
+                  </span>
+                  Debug
+                </button>
+              </div>
+            </div>
 
-        const sessionId = 's-' + Date.now();
-        const ws = new WebSocket(this.wsUrl);
-        
-        // Setup Grid Item
-        const el = document.createElement('div');
-        el.className = 'grid-stack-item';
-        el.dataset.sessionId = sessionId;
-        el.innerHTML = `
-          <div class="grid-stack-item-content">
-             <div class="term-header">
-               <div class="term-lights">
-                 <div class="light red"></div>
-                 <div class="light yellow"></div>
-                 <div class="light green"></div>
-               </div>
-               <div class="term-title">${target.name}</div>
-             </div>
-             <div class="term-body" id="term-${sessionId}"></div>
+            <div class="session-bar" id="sessionBar"></div>
+
+            <div class="grid-stack" id="grid">
+              <div class="empty-state" id="emptyState">
+                Select a target to launch terminals. Drag and resize tiles freely.
+              </div>
+            </div>
+          </main>
+        </div>
+
+        <div class="toast" id="toast"></div>
+        <div class="debug-panel" id="debugPanel">
+          <div class="debug-header">
+            <h4>Debug Console</h4>
+            <div class="debug-actions">
+              <button class="btn" id="debugClearBtn">Clear</button>
+              <button class="btn" id="debugCloseBtn">Close</button>
+            </div>
           </div>
-        `;
+          <div class="debug-log" id="debugLog"></div>
+        </div>
 
-        // Add to grid
-        if (this.grid) {
-          this.grid.addWidget(el, { w: 6, h: 4, minW: 3, minH: 2 });
-        } else {
-          document.getElementById('grid').appendChild(el);
-        }
+        <script src="/vendor/gridstack-all.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js'"></script>
+        <script src="/vendor/xterm.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'"></script>
+        <script src="/vendor/xterm-addon-fit.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js'"></script>
+        <script>
+          // Check authentication
+          if (localStorage.getItem('authenticated') !== 'true') {
+            window.location.href = '/login.html';
+          }
 
-        document.getElementById('emptyState').style.display = 'none';
+          class TerminalApp {
+            constructor() {
+              this.targets = [];
+              this.terminals = new Map();
+              this.activeSessionId = null;
+              this.filterType = 'all';
+              this.authByTarget = new Map();
+              this.debugOpen = false;
+              this.wsUrl = this.getWsUrl();
+              this.grid = this.createGrid();
 
-        // Init XTerm
-        const term = new Terminal({
-           theme: { background: '#000000', foreground: '#f5f5f5' },
-           cursorBlink: true,
-           fontSize: 13,
-           fontFamily: 'Menlo, Monaco, "Courier New", monospace'
-        });
-        const fitAddon = new FitAddon.FitAddon();
-        term.loadAddon(fitAddon);
-        
-        term.open(document.getElementById(`term-${sessionId}`));
-        fitAddon.fit();
-
-        // WS Logic
-        ws.onopen = () => {
-           ws.send(JSON.stringify({
-             type: 'open',
-             targetId: target.id,
-             sessionId: sessionId,
-             cols: term.cols,
-             rows: term.rows,
-             password: password,
-             acceptHostKey: true // Auto accept for easier UX in demo
-           }));
-        };
-
-        ws.onmessage = (msg) => {
-           const payload = JSON.parse(msg.data);
-           if (payload.type === 'output') term.write(payload.data);
-           if (payload.type === 'ready') fitAddon.fit();
-           if (payload.type === 'error') {
-             this.showToast(payload.error);
-             if (payload.code === 'HOSTKEY') {
-                // If we didn't auto-accept, we'd handle it here
-             }
-           }
-        };
-
-        ws.onclose = () => {
-           term.write('\r\nConnection closed.');
-           // Use a timeout to not remove immediately so user sees "closed"
-        };
-        
-        term.onData(d => {
-           if (ws.readyState === WebSocket.OPEN) {
-             ws.send(JSON.stringify({ type: 'input', sessionId, data: d }));
-           }
-        });
-        
-        // Tracking
-        this.terminals.set(sessionId, { term, fitAddon, ws, el });
-        
-        // Close handler (red light)
-        el.querySelector('.light.red').addEventListener('click', () => {
-           this.closeSession(sessionId);
-        });
-
-        // Add Tab
-        this.addTab(sessionId, target.name);
-      }
-
-      closeSession(sid) {
-         const s = this.terminals.get(sid);
-         if (s) {
-           s.ws.close();
-           s.term.dispose();
-           if (this.grid) this.grid.removeWidget(s.el);
-           else s.el.remove();
-           this.terminals.delete(sid);
-         }
-         
-         const tab = document.querySelector(`.tab[data-sid="${sid}"]`);
-         if (tab) tab.remove();
-         
-         if (this.terminals.size === 0) {
-            document.getElementById('emptyState').style.display = 'flex';
-         }
-      }
-
-      addTab(sid, name) {
-         const area = document.getElementById('tabsArea');
-         const tab = document.createElement('div');
-         tab.className = 'tab';
-         tab.dataset.sid = sid;
-         tab.innerHTML = `
-           <span>${name}</span>
-           <span class="tab-close">×</span>
-         `;
-         tab.querySelector('.tab-close').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.closeSession(sid);
-         });
-         tab.addEventListener('click', () => {
-            const s = this.terminals.get(sid);
-            if (s) s.el.scrollIntoView({ behavior: 'smooth' });
-         });
-         area.appendChild(tab);
-      }
-
-      resizeTerminal(sid) {
-         const s = this.terminals.get(sid);
-         if (s) {
-            s.fitAddon.fit();
-            if (s.ws.readyState === WebSocket.OPEN) {
-               s.ws.send(JSON.stringify({ type: 'resize', sessionId: sid, cols: s.term.cols, rows: s.term.rows }));
+              this.bindUI();
+              this.init();
             }
-         }
-      }
 
-      showToast(msg) {
-        const t = document.getElementById('toast');
-        t.innerText = msg;
-        t.classList.add('show');
-        setTimeout(() => t.classList.remove('show'), 3000);
-      }
-    }
+            createGrid() {
+              try {
+                if (!window.GridStack) {
+                  throw new Error('GridStack not available');
+                }
+                return GridStack.init(
+                  {
+                    margin: 10,
+                    float: true,
+                    cellHeight: 180,
+                    draggable: { handle: '.tile-header', cancel: '.tile-actions button, .traffic-lights, .traffic-lights span' },
+                    resizable: { handles: 'all' },
+                  },
+                  '#grid'
+                );
+              } catch (error) {
+                console.error('Grid init failed:', error);
+                const gridEl = document.getElementById('grid');
+                return {
+                  on: () => {},
+                  addWidget: (el) => {
+                    gridEl?.appendChild(el);
+                    return el;
+                  },
+                  removeWidget: (el) => {
+                    el?.remove();
+                  },
+                };
+              }
+            }
 
-    // Start
-    window.onload = () => {
-      new BastionApp();
-    };
-  </script>
-</body>
-</html>
+            getWsUrl() {
+              const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+              return `${protocol}://${window.location.host}`;
+            }
+
+            getTargetKey(target) {
+              return (
+                target.id ??
+                `${(target.type ?? 'target').toString()}:${(target.vmid ?? '').toString()}:${(target.name ?? '').toString()}:${
+                  (target.host ?? '').toString()
+                }:${(target.ip ?? '').toString()}`
+              );
+            }
+
+            bindUI() {
+              document.getElementById('refreshBtn')?.addEventListener('click', () => this.reload());
+              document.getElementById('newSessionBtn')?.addEventListener('click', () => {
+                if (this.targets.length) {
+                  this.openTerminal(this.targets[0]);
+                } else {
+                  this.toast('No targets available.');
+                }
+              });
+
+              document.getElementById('debugToggleBtn')?.addEventListener('click', () => this.toggleDebug());
+              document.getElementById('debugCloseBtn')?.addEventListener('click', () => this.setDebug(false));
+              document.getElementById('debugClearBtn')?.addEventListener('click', () => this.clearDebug());
+
+              document.getElementById('searchInput')?.addEventListener('input', () => this.renderTargets());
+
+              document.querySelectorAll('.chip').forEach((chip) => {
+                chip.addEventListener('click', () => {
+                  document.querySelectorAll('.chip').forEach((c) => c.classList.remove('active'));
+                  chip.classList.add('active');
+                  this.filterType = chip.dataset.filter;
+                  this.renderTargets();
+                });
+              });
+
+              this.grid?.on?.('resizestop', (event, el) => {
+                const sessionId = el?.dataset?.sessionId;
+                if (sessionId) {
+                  const data = this.terminals.get(sessionId);
+                  data?.fitAddon?.fit();
+                  if (data?.ws?.readyState === WebSocket.OPEN) {
+                    data.ws.send(
+                      JSON.stringify({
+                        type: 'resize',
+                        sessionId,
+                        cols: data.term.cols,
+                        rows: data.term.rows,
+                      })
+                    );
+                  }
+                }
+              });
+            }
+
+            setDebug(open) {
+              this.debugOpen = open;
+              const panel = document.getElementById('debugPanel');
+              panel.classList.toggle('show', open);
+            }
+
+            toggleDebug() {
+              this.setDebug(!this.debugOpen);
+            }
+
+            clearDebug() {
+              const log = document.getElementById('debugLog');
+              log.innerHTML = '';
+            }
+
+            logDebug(message, data = {}) {
+              const log = document.getElementById('debugLog');
+              const entry = document.createElement('div');
+              entry.className = 'debug-entry';
+              const time = new Date().toLocaleTimeString();
+              const payload = Object.keys(data).length ? `\n${JSON.stringify(data, null, 2)}` : '';
+              entry.innerHTML = `<strong>${time}</strong> ${message}<pre style="white-space: pre-wrap; margin-top: 6px; color: #9ca3af;">${payload}</pre>`;
+              log.prepend(entry);
+              if (this.debugOpen) {
+                log.scrollTop = 0;
+              }
+            }
+
+            async init() {
+              await this.loadTargets();
+              await this.loadBuildInfo();
+              this.renderTargets();
+              this.updateSummary();
+            }
+
+            async reload() {
+              await this.loadTargets();
+              this.renderTargets();
+              this.updateSummary();
+            }
+
+            async loadTargets() {
+              try {
+                const response = await fetch('/api/targets');
+                const data = await response.json();
+                this.targets = data.targets || [];
+                this.mode = data.mode || 'unknown';
+                const running = this.targets.filter((t) => t.status === 'running').length;
+                document.getElementById('modePill').textContent = `${this.mode} mode · ${running}/${this.targets.length} running`;
+              } catch (err) {
+                console.error('Failed to load targets:', err);
+                this.toast('Failed to load targets.');
+              }
+            }
+
+            async loadBuildInfo() {
+              try {
+                const response = await fetch('/api/build');
+                const data = await response.json();
+                const build = data.build || 'unknown';
+                document.getElementById('buildText').textContent = `Build: ${build}`;
+              } catch (error) {
+                document.getElementById('buildText').textContent = 'Build: unknown';
+              }
+            }
+
+            updateSummary() {
+              const text = this.targets.length
+                ? `${this.targets.length} targets · ${this.terminals.size} active terminals`
+                : 'No targets discovered yet';
+              document.getElementById('summaryText').textContent = text;
+            }
+
+            renderTargets() {
+              const list = document.getElementById('targetList');
+              const query = document.getElementById('searchInput').value.toLowerCase();
+
+              const filtered = this.targets.filter((target) => {
+                const name = (target.name ?? '').toString();
+                const ip = (target.ip ?? target.host ?? '').toString();
+                const vmid = (target.vmid ?? '').toString();
+                const matchesQuery =
+                  name.toLowerCase().includes(query) ||
+                  ip.toLowerCase().includes(query) ||
+                  vmid.toLowerCase().includes(query);
+                const type = (target.type ?? 'unknown').toString();
+                const matchesType = this.filterType === 'all' || type === this.filterType;
+                return matchesQuery && matchesType;
+              });
+
+              if (!filtered.length) {
+                list.innerHTML = '<div class="empty-state">No matching targets.</div>';
+                return;
+              }
+
+              list.innerHTML = filtered
+                .map(
+                  (target) => {
+                    const targetKey = this.getTargetKey(target);
+                    const type = (target.type ?? 'unknown').toString();
+                    const status = (target.status ?? 'unknown').toString();
+                    const name = (target.name ?? 'Unknown').toString();
+                    const node = (target.node ?? 'node').toString();
+                    const vmid = (target.vmid ?? '—').toString();
+                    const ip = (target.ip ?? 'No IP').toString();
+                    const os = (target.os ?? 'Unknown OS').toString();
+                    const username = (target.username ?? 'unknown').toString();
+                    return `
+                  <div class="target-card">
+                    <div class="target-header">
+                      <div>
+                        <div class="target-name">${name}</div>
+                        <div class="target-meta">${type.toUpperCase()} · ${node} · ${vmid}</div>
+                      </div>
+                      <span class="badge ${status}">${status}</span>
+                    </div>
+                    <div class="target-meta">${ip} · ${os} · ${username}</div>
+                    <div class="target-actions">
+                      <button class="btn" data-action="open" data-id="${targetKey}" ${target.status !== 'running' ? 'disabled' : ''}>Open Terminal</button>
+                      <button class="btn" data-action="open-split" data-id="${targetKey}" ${target.status !== 'running' ? 'disabled' : ''}>Open Split</button>
+                    </div>
+                  </div>
+                `;
+                  }
+                )
+                .join('');
+
+              list.querySelectorAll('button[data-action]').forEach((button) => {
+                button.addEventListener('click', () => {
+                  if (button.disabled) {
+                    this.toast('Target is offline.');
+                    return;
+                  }
+                  const target = this.targets.find((t) => this.getTargetKey(t) === button.dataset.id);
+                  if (!target) return;
+                  const isSplit = button.dataset.action === 'open-split';
+                  this.openTerminal(target, isSplit ? { w: 3, h: 4 } : undefined);
+                });
+              });
+            }
+
+            openTerminal(target, layout, retryState = {}) {
+              if (!window.Terminal || !window.FitAddon?.FitAddon) {
+                this.toast('Terminal engine failed to load. Check network or CDN.');
+                this.logDebug('Terminal engine missing', {
+                  terminal: !!window.Terminal,
+                  fitAddon: !!window.FitAddon?.FitAddon,
+                });
+                return;
+              }
+              if (target.status !== 'running') {
+                this.toast('Target is offline.');
+                return;
+              }
+              if (!target.ip) {
+                this.toast('Target has no IP address.');
+                return;
+              }
+
+              const targetKey = this.getTargetKey(target);
+              const authState = this.authByTarget.get(targetKey) || {
+                password: null,
+                hostKeyAccepted: false,
+              };
+
+              if (retryState.forcePasswordPrompt || !authState.password) {
+                const password = window.prompt(`Enter SSH password for ${target.name}`);
+                if (!password) {
+                  this.toast('Password required to open terminal.');
+                  return;
+                }
+                authState.password = password;
+                retryState.forcePasswordPrompt = false;
+              }
+
+              const sessionId = `session-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+              const ws = new WebSocket(this.wsUrl);
+
+              ws.onopen = () => {
+                this.logDebug('WebSocket open', { sessionId, targetId: target.id });
+                ws.send(
+                  JSON.stringify({
+                    type: 'open',
+                    targetId: target.id,
+                    sessionId,
+                    cols: 80,
+                    rows: 24,
+                    password: authState.password,
+                    acceptHostKey: authState.hostKeyAccepted,
+                  })
+                );
+              };
+
+              let sessionReady = false;
+              ws.onmessage = (event) => {
+                const msg = JSON.parse(event.data);
+                const session = this.terminals.get(sessionId);
+
+                if (!session) return;
+
+                if (msg.type === 'ready') {
+                  this.logDebug('Terminal ready', { sessionId });
+                  sessionReady = true;
+                  session.term.focus();
+                  session.fitAddon.fit();
+                  session.sendResize?.();
+                  this.focusSession(sessionId);
+                } else if (msg.type === 'output') {
+                  session.term.write(msg.data);
+                } else if (msg.type === 'close') {
+                  this.logDebug('Terminal closed', { sessionId });
+                  this.closeTerminal(sessionId);
+                } else if (msg.type === 'error') {
+                  this.logDebug('Terminal error', { sessionId, error: msg.error, code: msg.code, fingerprint: msg.fingerprint });
+                  if (msg.code === 'HOSTKEY') {
+                    const confirm = window.prompt(
+                      `Host key fingerprint for ${target.name}: ${msg.fingerprint}\nType YES to trust and continue`
+                    );
+                    if (confirm && confirm.toLowerCase() === 'yes') {
+                      authState.hostKeyAccepted = true;
+                      this.authByTarget.set(targetKey, authState);
+                      this.closeTerminal(sessionId);
+                      this.openTerminal(target, layout, { forcePasswordPrompt: !authState.password });
+                      return;
+                    }
+                    this.toast('Host key not accepted.');
+                    this.closeTerminal(sessionId);
+                    return;
+                  }
+
+                  if (msg.code === 'NO_AUTH') {
+                    this.closeTerminal(sessionId);
+                    this.openTerminal(target, layout, { forcePasswordPrompt: true });
+                    return;
+                  }
+
+                  session.term.write(`\r\nError: ${msg.error}\r\n`);
+                } else if (msg.type === 'debug') {
+                  this.logDebug(msg.message || 'Debug', msg.data || {});
+                }
+              };
+
+              ws.onclose = () => {
+                this.logDebug('WebSocket closed', { sessionId });
+                this.closeTerminal(sessionId);
+              };
+
+              const tile = document.createElement('div');
+              tile.className = 'grid-stack-item';
+              tile.dataset.sessionId = sessionId;
+              tile.innerHTML = `
+                <div class="grid-stack-item-content">
+                  <div class="tile-header">
+                    <div>
+                      <div class="traffic-lights" aria-hidden="true">
+                        <span class="close"></span>
+                        <span class="min"></span>
+                        <span class="max"></span>
+                      </div>
+                      <h4>${target.name}</h4>
+                      <span>${target.ip || target.host} · ${target.type.toUpperCase()}</span>
+                    </div>
+                    <div class="tile-actions">
+                      <button title="Focus" data-action="focus">
+                        <span class="icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M7 3h10v2H7zM3 7h2v10H3zm16 0h2v10h-2zM7 19h10v2H7z" />
+                          </svg>
+                        </span>
+                      </button>
+                      <button title="Close" data-action="close">
+                        <span class="icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" fill="none" />
+                          </svg>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="terminal-surface" id="terminal-${sessionId}"></div>
+                </div>
+              `;
+
+              this.grid.addWidget(tile, { w: layout?.w || 6, h: layout?.h || 4, minW: 3, minH: 2 });
+
+              const liveTile = document.querySelector(`.grid-stack-item[data-session-id="${sessionId}"]`);
+              const tileEl = liveTile || tile;
+
+              tileEl.querySelector('[data-action="close"]').addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.closeTerminal(sessionId);
+              });
+
+              tileEl.querySelector('[data-action="focus"]').addEventListener('click', (event) => {
+                event.stopPropagation();
+                this.focusSession(sessionId);
+              });
+
+              let terminalEl = tileEl.querySelector(`#terminal-${sessionId}`);
+              if (!terminalEl) {
+                terminalEl = document.createElement('div');
+                terminalEl.className = 'terminal-surface';
+                terminalEl.id = `terminal-${sessionId}`;
+                tileEl.querySelector('.grid-stack-item-content')?.appendChild(terminalEl);
+              }
+
+              let term;
+              let fitAddon;
+              try {
+                if (!window.Terminal) {
+                  throw new Error('xterm.js failed to load');
+                }
+                term = new window.Terminal({
+                  cursorBlink: true,
+                  fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                  theme: {
+                    background: '#000000',
+                    foreground: '#f5f5f7',
+                    cursor: '#64d2ff',
+                  },
+                });
+
+                fitAddon = new window.FitAddon.FitAddon();
+                term.loadAddon(fitAddon);
+                term.open(terminalEl);
+                fitAddon.fit();
+              } catch (error) {
+                console.error('Failed to create terminal:', error);
+                const errorMessage = error?.message || 'Unknown error';
+                this.toast(`Terminal failed to initialize: ${errorMessage}`);
+                this.logDebug('Terminal init failed', { sessionId, error: errorMessage });
+                ws.close();
+                this.grid.removeWidget(tileEl);
+                return;
+              }
+
+              let lastSize = { cols: null, rows: null };
+              let resizeScheduled = false;
+              const sendResize = () => {
+                if (!sessionReady) return;
+                if (ws.readyState !== WebSocket.OPEN) return;
+                if (lastSize.cols === term.cols && lastSize.rows === term.rows) return;
+                lastSize = { cols: term.cols, rows: term.rows };
+                ws.send(
+                  JSON.stringify({
+                    type: 'resize',
+                    sessionId,
+                    cols: term.cols,
+                    rows: term.rows,
+                  })
+                );
+              };
+
+              const scheduleResize = () => {
+                if (resizeScheduled) return;
+                resizeScheduled = true;
+                window.setTimeout(() => {
+                  resizeScheduled = false;
+                  fitAddon.fit();
+                  sendResize();
+                }, 100);
+              };
+
+              const resizeHandler = () => scheduleResize();
+              window.addEventListener('resize', resizeHandler);
+
+              let observer = null;
+
+              term.onData((data) => {
+                ws.send(
+                  JSON.stringify({
+                    type: 'input',
+                    sessionId,
+                    data,
+                  })
+                );
+              });
+
+              this.terminals.set(sessionId, {
+                ws,
+                term,
+                fitAddon,
+                tile: tileEl,
+                target,
+                observer,
+                resizeHandler,
+                sendResize,
+              });
+
+              this.authByTarget.set(targetKey, authState);
+
+              this.addSessionTab(sessionId, target);
+              this.hideEmptyState();
+              this.updateSummary();
+            }
+
+            addSessionTab(sessionId, target) {
+              const tab = document.createElement('div');
+              tab.className = 'session-tab';
+              tab.dataset.sessionId = sessionId;
+              tab.innerHTML = `
+                <span>${target.name}</span>
+                <span class="close">×</span>
+              `;
+
+              tab.addEventListener('click', (event) => {
+                if (event.target.classList.contains('close')) {
+                  this.closeTerminal(sessionId);
+                  return;
+                }
+                this.focusSession(sessionId);
+              });
+
+              document.getElementById('sessionBar').appendChild(tab);
+            }
+
+            focusSession(sessionId) {
+              if (this.activeSessionId && this.terminals.has(this.activeSessionId)) {
+                this.terminals.get(this.activeSessionId).tile.classList.remove('tile-active');
+                const oldTab = document.querySelector(`.session-tab[data-session-id="${this.activeSessionId}"]`);
+                oldTab?.classList.remove('active');
+              }
+
+              this.activeSessionId = sessionId;
+              const session = this.terminals.get(sessionId);
+              if (!session) return;
+
+              session.tile.classList.add('tile-active');
+              const tab = document.querySelector(`.session-tab[data-session-id="${sessionId}"]`);
+              tab?.classList.add('active');
+              session.tile.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              session.fitAddon.fit();
+            }
+
+            closeTerminal(sessionId) {
+              const session = this.terminals.get(sessionId);
+              if (!session) return;
+
+              if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+                session.ws.send(JSON.stringify({ type: 'close', sessionId }));
+                session.ws.close();
+              }
+
+              if (session.resizeHandler) {
+                window.removeEventListener('resize', session.resizeHandler);
+              }
+              session.observer?.disconnect();
+              session.term.dispose();
+              this.grid.removeWidget(session.tile);
+              this.terminals.delete(sessionId);
+
+              const tab = document.querySelector(`.session-tab[data-session-id="${sessionId}"]`);
+              tab?.remove();
+
+              if (this.activeSessionId === sessionId) {
+                const remaining = this.terminals.keys().next().value;
+                if (remaining) {
+                  this.focusSession(remaining);
+                } else {
+                  this.activeSessionId = null;
+                  this.showEmptyState();
+                }
+              }
+
+              this.updateSummary();
+            }
+
+            showEmptyState() {
+              document.getElementById('emptyState').style.display = 'block';
+            }
+
+            hideEmptyState() {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+
+            toast(message) {
+              const toast = document.getElementById('toast');
+              toast.textContent = message;
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+          }
+
+          const app = new TerminalApp();
+        </script>
+      </body>
+    </html>
+            hideEmptyState() {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+
+            toast(message) {
+              const toast = document.getElementById('toast');
+              toast.textContent = message;
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+          }
+
+          const app = new TerminalApp();
+        </script>
+      </body>
+    </html>
