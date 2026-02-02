@@ -519,7 +519,7 @@
                   margin: 10,
                   float: true,
                   cellHeight: 180,
-                  draggable: { handle: '.tile-header', cancel: '.tile-actions button' },
+                  draggable: { handle: '.tile-header', cancel: '.tile-actions button, .traffic-lights, .traffic-lights span' },
                   resizable: { handles: 'all' },
                 },
                 '#grid'
@@ -638,8 +638,8 @@
                     </div>
                     <div class="target-meta">${target.ip || 'No IP'} · ${target.os || 'Unknown OS'} · ${target.username}</div>
                     <div class="target-actions">
-                      <button class="btn" data-action="open" data-id="${target.id}">Open Terminal</button>
-                      <button class="btn" data-action="open-split" data-id="${target.id}">Open Split</button>
+                      <button class="btn" data-action="open" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Terminal</button>
+                      <button class="btn" data-action="open-split" data-id="${target.id}" ${target.status !== 'running' ? 'disabled' : ''}>Open Split</button>
                     </div>
                   </div>
                 `
@@ -648,6 +648,10 @@
 
               list.querySelectorAll('button[data-action]').forEach((button) => {
                 button.addEventListener('click', () => {
+                  if (button.disabled) {
+                    this.toast('Target is offline.');
+                    return;
+                  }
                   const target = this.targets.find((t) => t.id === button.dataset.id);
                   if (!target) return;
                   const isSplit = button.dataset.action === 'open-split';
@@ -657,6 +661,10 @@
             }
 
             openTerminal(target, layout) {
+              if (target.status !== 'running') {
+                this.toast('Target is offline.');
+                return;
+              }
               if (!target.host) {
                 this.toast('Target has no reachable host/IP.');
                 return;
@@ -736,31 +744,51 @@
 
               this.grid.addWidget(tile, { w: layout?.w || 6, h: layout?.h || 4, minW: 3, minH: 2 });
 
-              tile.querySelector('[data-action="close"]').addEventListener('click', (event) => {
+              const liveTile = document.querySelector(`.grid-stack-item[data-session-id="${sessionId}"]`);
+              const tileEl = liveTile || tile;
+
+              tileEl.querySelector('[data-action="close"]').addEventListener('click', (event) => {
                 event.stopPropagation();
                 this.closeTerminal(sessionId);
               });
 
-              tile.querySelector('[data-action="focus"]').addEventListener('click', (event) => {
+              tileEl.querySelector('[data-action="focus"]').addEventListener('click', (event) => {
                 event.stopPropagation();
                 this.focusSession(sessionId);
               });
 
-              const terminalEl = tile.querySelector(`#terminal-${sessionId}`);
-              const term = new Terminal({
-                cursorBlink: true,
-                fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
-                theme: {
-                  background: '#000000',
-                  foreground: '#f5f5f7',
-                  cursor: '#64d2ff',
-                },
-              });
+              let terminalEl = tileEl.querySelector(`#terminal-${sessionId}`);
+              if (!terminalEl) {
+                terminalEl = document.createElement('div');
+                terminalEl.className = 'terminal-surface';
+                terminalEl.id = `terminal-${sessionId}`;
+                tileEl.querySelector('.grid-stack-item-content')?.appendChild(terminalEl);
+              }
 
-              const fitAddon = new FitAddon.FitAddon();
-              term.loadAddon(fitAddon);
-              term.open(terminalEl);
-              fitAddon.fit();
+              let term;
+              let fitAddon;
+              try {
+                term = new Terminal({
+                  cursorBlink: true,
+                  fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
+                  theme: {
+                    background: '#000000',
+                    foreground: '#f5f5f7',
+                    cursor: '#64d2ff',
+                  },
+                });
+
+                fitAddon = new FitAddon.FitAddon();
+                term.loadAddon(fitAddon);
+                term.open(terminalEl);
+                fitAddon.fit();
+              } catch (error) {
+                console.error('Failed to create terminal:', error);
+                this.toast('Terminal failed to initialize.');
+                ws.close();
+                this.grid.removeWidget(tileEl);
+                return;
+              }
 
               const sendResize = () => {
                 if (ws.readyState === WebSocket.OPEN) {
@@ -777,11 +805,14 @@
 
               sendResize();
 
-              const observer = new ResizeObserver(() => {
-                fitAddon.fit();
-                sendResize();
-              });
-              observer.observe(terminalEl);
+              let observer = null;
+              if (typeof ResizeObserver !== 'undefined') {
+                observer = new ResizeObserver(() => {
+                  fitAddon.fit();
+                  sendResize();
+                });
+                observer.observe(terminalEl);
+              }
 
               term.onData((data) => {
                 ws.send(
@@ -797,7 +828,7 @@
                 ws,
                 term,
                 fitAddon,
-                tile,
+                tile: tileEl,
                 target,
                 observer,
               });
@@ -854,7 +885,7 @@
                 session.ws.close();
               }
 
-              session.observer.disconnect();
+              session.observer?.disconnect();
               session.term.dispose();
               this.grid.removeWidget(session.tile);
               this.terminals.delete(sessionId);
@@ -878,6 +909,23 @@
             showEmptyState() {
               document.getElementById('emptyState').style.display = 'block';
             }
+
+            hideEmptyState() {
+              document.getElementById('emptyState').style.display = 'none';
+            }
+
+            toast(message) {
+              const toast = document.getElementById('toast');
+              toast.textContent = message;
+              toast.classList.add('show');
+              setTimeout(() => toast.classList.remove('show'), 2000);
+            }
+          }
+
+          const app = new TerminalApp();
+        </script>
+      </body>
+    </html>
 
             hideEmptyState() {
               document.getElementById('emptyState').style.display = 'none';
