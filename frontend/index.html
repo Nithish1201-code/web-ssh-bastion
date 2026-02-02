@@ -1036,17 +1036,30 @@
                 return;
               }
 
+              let lastSize = { cols: null, rows: null };
+              let resizeScheduled = false;
               const sendResize = () => {
-                if (ws.readyState === WebSocket.OPEN) {
-                  ws.send(
-                    JSON.stringify({
-                      type: 'resize',
-                      sessionId,
-                      cols: term.cols,
-                      rows: term.rows,
-                    })
-                  );
-                }
+                if (ws.readyState !== WebSocket.OPEN) return;
+                if (lastSize.cols === term.cols && lastSize.rows === term.rows) return;
+                lastSize = { cols: term.cols, rows: term.rows };
+                ws.send(
+                  JSON.stringify({
+                    type: 'resize',
+                    sessionId,
+                    cols: term.cols,
+                    rows: term.rows,
+                  })
+                );
+              };
+
+              const scheduleResize = () => {
+                if (resizeScheduled) return;
+                resizeScheduled = true;
+                requestAnimationFrame(() => {
+                  resizeScheduled = false;
+                  fitAddon.fit();
+                  sendResize();
+                });
               };
 
               sendResize();
@@ -1054,8 +1067,7 @@
               let observer = null;
               if (typeof ResizeObserver !== 'undefined') {
                 observer = new ResizeObserver(() => {
-                  fitAddon.fit();
-                  sendResize();
+                  scheduleResize();
                 });
                 observer.observe(terminalEl);
               }
