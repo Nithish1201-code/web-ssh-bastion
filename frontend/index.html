@@ -23,20 +23,22 @@
         <style>
           :root {
             color-scheme: dark;
-            --bg: #030712;
-            --panel: rgba(17, 24, 39, 0.4);
-            --panel-2: rgba(31, 41, 55, 0.45);
-            --panel-3: rgba(31, 41, 55, 0.6);
-            --border: rgba(255, 255, 255, 0.08);
+            --bg: #070a12;
+            --bg-2: #0b1220;
+            --panel: rgba(15, 23, 42, 0.7);
+            --panel-2: rgba(17, 24, 39, 0.8);
+            --panel-3: rgba(2, 6, 23, 0.8);
+            --border: rgba(148, 163, 184, 0.18);
             --text: #f8fafc;
             --muted: #94a3b8;
-            --accent: #00e5ff;
-            --accent-2: #06b6d4;
-            --success: #10b981;
+            --accent: #38bdf8;
+            --accent-2: #22d3ee;
+            --success: #22c55e;
             --warning: #f59e0b;
-            --danger: #ef4444;
-            --glass: rgba(17, 24, 39, 0.4);
-            --glow: 0 0 5px rgba(0, 229, 255, 0.2), 0 0 20px rgba(0, 229, 255, 0.1);
+            --danger: #f87171;
+            --glass: rgba(15, 23, 42, 0.6);
+            --glow: 0 0 0 1px rgba(56, 189, 248, 0.14), 0 20px 60px rgba(2, 132, 199, 0.2);
+            --shadow-soft: 0 12px 30px rgba(2, 6, 23, 0.55);
           }
 
           * {
@@ -47,12 +49,28 @@
 
           body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-            background: #030712;
+            background: radial-gradient(1200px circle at 12% -20%, rgba(56, 189, 248, 0.16), transparent 55%),
+                        radial-gradient(900px circle at 88% 0%, rgba(34, 211, 238, 0.12), transparent 40%),
+                        var(--bg);
             color: var(--text);
             letter-spacing: 0.01em;
             overflow-x: hidden;
             -webkit-font-smoothing: antialiased;
             -moz-osx-font-smoothing: grayscale;
+          }
+
+          body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+              linear-gradient(to right, rgba(148, 163, 184, 0.06) 1px, transparent 1px),
+              linear-gradient(to bottom, rgba(148, 163, 184, 0.06) 1px, transparent 1px);
+            background-size: 48px 48px;
+            opacity: 0.35;
+            pointer-events: none;
+            z-index: 0;
+            mask-image: radial-gradient(circle at center, black 30%, transparent 75%);
           }
 
           ::selection {
@@ -69,28 +87,30 @@
           }
 
           .sidebar {
-            background: var(--panel);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.85) 0%, rgba(2, 6, 23, 0.9) 100%);
             border-right: 1px solid var(--border);
-            padding: 24px;
+            padding: 26px;
             display: flex;
             flex-direction: column;
-            gap: 20px;
+            gap: 22px;
             overflow-y: auto;
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
           }
 
           .glass-panel {
-            background: rgba(17, 24, 39, 0.4);
+            background: var(--panel);
             backdrop-filter: blur(24px);
             -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-soft);
           }
 
           .glass-card {
-            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.75) 0%, rgba(2, 6, 23, 0.85) 100%);
             backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-soft);
           }
 
           .brand {
@@ -102,6 +122,7 @@
           .brand h1 {
             font-size: 20px;
             font-weight: 700;
+            letter-spacing: -0.02em;
           }
 
           .brand span {
@@ -116,10 +137,11 @@
             gap: 6px;
             padding: 6px 12px;
             border-radius: 999px;
-            background: rgba(0, 229, 255, 0.16);
+            background: rgba(56, 189, 248, 0.16);
             color: var(--accent);
             font-size: 12px;
-            border: 1px solid rgba(0, 229, 255, 0.25);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
           }
 
           .filters {
@@ -133,9 +155,16 @@
             padding: 11px 12px;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: rgba(17, 24, 39, 0.6);
+            background: rgba(2, 6, 23, 0.7);
             color: var(--text);
             box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+            transition: border 0.2s ease, box-shadow 0.2s ease;
+          }
+
+          .filters input:focus {
+            outline: none;
+            border-color: rgba(56, 189, 248, 0.7);
+            box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
           }
 
           .filter-row {
@@ -147,7 +176,7 @@
             padding: 6px 12px;
             border-radius: 999px;
             border: 1px solid var(--border);
-            background: rgba(17, 24, 39, 0.5);
+            background: rgba(2, 6, 23, 0.6);
             font-size: 12px;
             color: var(--muted);
             cursor: pointer;
@@ -167,21 +196,21 @@
           }
 
           .target-card {
-            background: linear-gradient(180deg, rgba(31, 41, 55, 0.4) 0%, rgba(17, 24, 39, 0.3) 100%);
+            background: linear-gradient(180deg, rgba(15, 23, 42, 0.78) 0%, rgba(2, 6, 23, 0.9) 100%);
             border: 1px solid var(--border);
             border-radius: 16px;
-            padding: 14px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            gap: 12px;
+            box-shadow: var(--shadow-soft);
             backdrop-filter: blur(20px);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
           }
 
           .target-card:hover {
-            border-color: rgba(0, 229, 255, 0.3);
-            box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.5);
+            border-color: rgba(56, 189, 248, 0.4);
+            box-shadow: 0 20px 45px rgba(2, 6, 23, 0.6);
             transform: translateY(-2px);
           }
 
@@ -234,7 +263,7 @@
             padding: 8px 12px;
             border-radius: 12px;
             border: 1px solid var(--border);
-            background: rgba(17, 24, 39, 0.6);
+            background: rgba(2, 6, 23, 0.7);
             color: var(--text);
             cursor: pointer;
             font-size: 12px;
@@ -246,16 +275,16 @@
           }
 
           .btn.primary {
-            background: linear-gradient(135deg, #00e5ff 0%, #06b6d4 100%);
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
             border: none;
-            color: #030712;
+            color: #03101b;
             font-weight: 700;
-            box-shadow: 0 4px 15px rgba(0, 229, 255, 0.3);
+            box-shadow: 0 10px 24px rgba(56, 189, 248, 0.3);
           }
 
           .btn.primary:hover {
-            box-shadow: 0 6px 20px rgba(0, 229, 255, 0.5);
-            transform: scale(1.02);
+            box-shadow: 0 18px 36px rgba(56, 189, 248, 0.4);
+            transform: translateY(-1px) scale(1.01);
           }
 
           .icon {

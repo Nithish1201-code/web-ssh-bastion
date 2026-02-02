@@ -3,17 +3,27 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login - Bastion</title>
+  <title>Web SSH Bastion • Sign In</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+  />
   <style>
     :root {
-      --bg: #09090b;
-      --panel: #18181b;
-      --border: #27272a;
-      --text: #f4f4f5;
-      --muted: #a1a1aa;
+      color-scheme: dark;
+      --bg: #070a12;
+      --bg-2: #0b1220;
+      --panel: rgba(15, 23, 42, 0.7);
+      --panel-strong: rgba(15, 23, 42, 0.9);
+      --border: rgba(148, 163, 184, 0.18);
+      --text: #f8fafc;
+      --muted: #94a3b8;
       --accent: #38bdf8;
-      --accent-hover: #0ea5e9;
-      --danger: #ef4444;
+      --accent-2: #22d3ee;
+      --danger: #f87171;
+      --glow: 0 0 0 1px rgba(56, 189, 248, 0.12), 0 20px 60px rgba(2, 132, 199, 0.2);
     }
 
     * {
@@ -24,54 +34,55 @@
 
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
-      background: var(--bg);
+      background: radial-gradient(1200px circle at 20% -10%, rgba(56, 189, 248, 0.12), transparent 50%),
+                  radial-gradient(1000px circle at 90% 10%, rgba(14, 165, 233, 0.1), transparent 40%),
+                  var(--bg);
       color: var(--text);
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* Subtle grid background */
     .bg-grid {
       position: absolute;
       inset: 0;
-      background-image: 
-        linear-gradient(to right, #18181b 1px, transparent 1px),
-        linear-gradient(to bottom, #18181b 1px, transparent 1px);
-      background-size: 40px 40px;
-      opacity: 0.4;
+      background-image:
+        linear-gradient(to right, rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+      background-size: 48px 48px;
+      opacity: 0.35;
       pointer-events: none;
-      mask-image: radial-gradient(circle at center, black 30%, transparent 80%);
+      mask-image: radial-gradient(circle at center, black 40%, transparent 75%);
     }
 
     .login-wrapper {
       position: relative;
       width: 100%;
-      max-width: 360px;
-      padding: 20px;
+      max-width: 420px;
+      padding: 24px;
       z-index: 1;
     }
 
     .login-card {
       background: var(--panel);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
-      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
+      border-radius: 18px;
+      padding: 36px;
+      box-shadow: var(--glow);
+      backdrop-filter: blur(24px);
     }
 
     .brand {
       text-align: center;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
 
     .brand h1 {
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 700;
       letter-spacing: -0.02em;
-      color: var(--text);
       margin-bottom: 6px;
     }
 
@@ -81,13 +92,13 @@
     }
 
     .form-group {
-      margin-bottom: 20px;
+      margin-bottom: 18px;
     }
 
     .label {
       display: block;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 600;
       color: var(--muted);
       margin-bottom: 8px;
     }
@@ -98,50 +109,59 @@
 
     input {
       width: 100%;
-      background: #09090b;
+      background: rgba(2, 6, 23, 0.8);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
+      border-radius: 10px;
+      padding: 12px 14px;
       color: var(--text);
       font-size: 14px;
-      transition: all 0.2s;
+      transition: border 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    input::placeholder {
+      color: rgba(148, 163, 184, 0.6);
     }
 
     input:focus {
       outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.1);
+      border-color: rgba(56, 189, 248, 0.8);
+      box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.15);
+      transform: translateY(-1px);
     }
 
     button {
       width: 100%;
-      background: var(--text);
-      color: var(--bg);
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #03101b;
       border: none;
-      border-radius: 8px;
-      padding: 10px;
+      border-radius: 10px;
+      padding: 12px;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 700;
       cursor: pointer;
-      transition: opacity 0.2s;
-      margin-top: 8px;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      margin-top: 10px;
+      box-shadow: 0 14px 30px rgba(56, 189, 248, 0.25);
     }
 
     button:hover {
-      opacity: 0.9;
+      transform: translateY(-1px);
+      box-shadow: 0 18px 40px rgba(56, 189, 248, 0.35);
     }
 
     button:disabled {
-      opacity: 0.5;
+      opacity: 0.55;
       cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
     }
 
     .error-msg {
       margin-top: 16px;
-      padding: 10px;
-      border-radius: 6px;
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid rgba(239, 68, 68, 0.2);
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.25);
       color: var(--danger);
       font-size: 12px;
       text-align: center;
@@ -149,10 +169,10 @@
     }
 
     .footer {
-      margin-top: 24px;
+      margin-top: 20px;
       text-align: center;
       font-size: 11px;
-      color: #52525b;
+      color: rgba(148, 163, 184, 0.6);
     }
   </style>
 </head>
