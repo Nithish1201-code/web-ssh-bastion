@@ -36,6 +36,7 @@ if (authEnabled) {
     return res.json({ ok: true });
   });
 }
+
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
 // API Routes
@@ -51,9 +52,42 @@ app.get('/api/targets', async (req, res) => {
   }
 });
 
-  app.post('/logout', (req, res) => {
-    return res.json({ ok: true });
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
   });
+});
+
+app.get('/api/build', (req, res) => {
+  try {
+    const repoRoot = path.join(__dirname, '../..');
+    const build = execSync('git rev-list --count HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
+    res.json({ build });
+  } catch (error) {
+    res.json({ build: 'unknown' });
+  }
+});
+
+app.post('/api/terminal', async (req, res) => {
+  const { targetId } = req.body;
+  if (!targetId) {
+    return res.status(400).json({ error: 'targetId required' });
+  }
+
+  const target = await targetService.getTargetById(targetId);
+  if (!target) {
+    return res.status(404).json({ error: 'Target not found' });
+  }
+
+  res.json({ message: 'Use WebSocket at /ws to open terminal' });
+});
+
+// Catch-all: serve frontend
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../../frontend/index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Frontend not found. Ensure /frontend/index.html exists');
     }
   });
 });
@@ -68,25 +102,28 @@ async function startServer() {
   const HOST = config.host;
 
   server.listen(PORT, HOST, () => {
-    console.log(`
-╔════════════════════════════════════════════════════════╗
-║     Web SSH Bastion - Backend Server Started         ║
-╚════════════════════════════════════════════════════════╝
-
-Host:     http://${HOST}:${PORT}
-WebSocket: ws://${HOST}:${PORT}
-
-Targets:
-${safeTargets.map((t) => `  - ${t.name} (${t.host})`).join('\n')}
-
-API Endpoints:
-  - GET  /api/health       (server status)
-  - GET  /api/targets      (list of targets)
-  - POST /api/terminal     (terminal info)
-  - WS   /                 (terminal WebSocket)
-
-Ready to accept connections!
-`);
+    const targetLines = safeTargets.map((t) => '  - ' + t.name + ' (' + t.host + ')').join('\n');
+    console.log([
+      '',
+      '╔════════════════════════════════════════════════════════╗',
+      '║     Web SSH Bastion - Backend Server Started         ║',
+      '╚════════════════════════════════════════════════════════╝',
+      '',
+      'Host:     http://' + HOST + ':' + PORT,
+      'WebSocket: ws://' + HOST + ':' + PORT,
+      '',
+      'Targets:',
+      targetLines,
+      '',
+      'API Endpoints:',
+      '  - GET  /api/health       (server status)',
+      '  - GET  /api/targets      (list of targets)',
+      '  - POST /api/terminal     (terminal info)',
+      '  - WS   /                 (terminal WebSocket)',
+      '',
+      'Ready to accept connections!',
+      '',
+    ].join('\n'));
   });
 }
 
