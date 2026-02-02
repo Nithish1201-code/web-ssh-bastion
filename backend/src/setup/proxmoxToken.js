@@ -114,6 +114,14 @@ function parseTokenInput(input) {
   return trimmed.includes('!') && trimmed.includes('=') ? trimmed : null;
 }
 
+function normalizeTokenValue(tokenValue) {
+  if (!tokenValue) return tokenValue;
+  const [userPart, rest] = tokenValue.split('!');
+  if (!rest) return tokenValue;
+  const normalizedUser = normalizeUser(userPart);
+  return `${normalizedUser}!${rest}`;
+}
+
 async function runPermissions(user, tokenName) {
   await new Promise((resolve, reject) => {
     execFile('pveum', ['user', 'token', 'add', user, tokenName, '-privsep', '1'], (err, stdout, stderr) => {
@@ -202,19 +210,21 @@ async function ensureEnvConfig() {
 
   const proxmoxUser = normalizeUser(await askForValue('Proxmox user', defaults.PROXMOX_USER, validateNonEmpty));
 
-  let proxmoxToken = defaults.PROXMOX_API_TOKEN;
+  let proxmoxToken = normalizeTokenValue(defaults.PROXMOX_API_TOKEN);
   let tokenName = '';
   if (!proxmoxToken) {
     const maybeToken = await askForValue('Proxmox API token (or leave blank to enter name/secret)', '');
     const parsed = parseTokenInput(maybeToken);
     if (parsed) {
-      proxmoxToken = parsed;
+      proxmoxToken = normalizeTokenValue(parsed);
     } else {
       tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
       const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
       proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
     }
   }
+
+  proxmoxToken = normalizeTokenValue(proxmoxToken);
 
   while (true) {
     const permissionsPrompt = `\nApply these Proxmox permissions before continuing:\n` +
@@ -283,7 +293,7 @@ async function ensureEnvConfig() {
       if (reenter.toLowerCase() === 'y') {
         tokenName = await askForValue('Proxmox token name', tokenName || '', validateTokenPart);
         const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
-        values.PROXMOX_API_TOKEN = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+        values.PROXMOX_API_TOKEN = normalizeTokenValue(buildTokenValue(proxmoxUser, tokenName, tokenSecret));
         console.log(`Using API token: PVEAPIToken=${values.PROXMOX_API_TOKEN}`);
       }
     }
