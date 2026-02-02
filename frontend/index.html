@@ -21,18 +21,20 @@
         <style>
           :root {
             color-scheme: dark;
-            --bg: #0b0f17;
-            --panel: #111827;
-            --panel-2: #0f172a;
-            --panel-3: #111827;
-            --border: #1f2937;
-            --text: #e5e7eb;
+            --bg: #000000;
+            --panel: #050505;
+            --panel-2: #0a0a0a;
+            --panel-3: #101010;
+            --border: #1a1a1a;
+            --text: #f5f5f7;
             --muted: #9ca3af;
-            --accent: #38bdf8;
-            --accent-2: #8b5cf6;
-            --success: #22c55e;
-            --warning: #f59e0b;
-            --danger: #ef4444;
+            --accent: #64d2ff;
+            --accent-2: #a78bfa;
+            --success: #34d399;
+            --warning: #fbbf24;
+            --danger: #f87171;
+            --glass: rgba(15, 15, 15, 0.65);
+            --glow: 0 0 0 1px rgba(100, 210, 255, 0.2), 0 10px 30px rgba(0, 0, 0, 0.35);
           }
 
           * {
@@ -42,9 +44,10 @@
           }
 
           body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: var(--bg);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Text', system-ui, sans-serif;
+            background: radial-gradient(circle at 20% 20%, #0c0c0c 0%, #000 35%, #000 100%);
             color: var(--text);
+            letter-spacing: 0.01em;
           }
 
           .app {
@@ -54,13 +57,14 @@
           }
 
           .sidebar {
-            background: var(--panel);
+            background: linear-gradient(180deg, rgba(10, 10, 10, 0.98), rgba(5, 5, 5, 0.98));
             border-right: 1px solid var(--border);
             padding: 24px;
             display: flex;
             flex-direction: column;
             gap: 20px;
             overflow-y: auto;
+            box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.02);
           }
 
           .brand {
@@ -83,11 +87,12 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 999px;
-            background: rgba(56, 189, 248, 0.15);
+            background: rgba(100, 210, 255, 0.16);
             color: var(--accent);
             font-size: 12px;
+            border: 1px solid rgba(100, 210, 255, 0.25);
           }
 
           .filters {
@@ -98,11 +103,12 @@
 
           .filters input {
             width: 100%;
-            padding: 10px 12px;
-            border-radius: 10px;
+            padding: 11px 12px;
+            border-radius: 12px;
             border: 1px solid var(--border);
-            background: var(--panel-2);
+            background: #070707;
             color: var(--text);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
           }
 
           .filter-row {
@@ -111,14 +117,15 @@
           }
 
           .chip {
-            padding: 6px 10px;
+            padding: 6px 12px;
             border-radius: 999px;
             border: 1px solid var(--border);
-            background: var(--panel-2);
+            background: #0b0b0b;
             font-size: 12px;
             color: var(--muted);
             cursor: pointer;
             user-select: none;
+            transition: all 0.2s ease;
           }
 
           .chip.active {
@@ -133,13 +140,14 @@
           }
 
           .target-card {
-            background: var(--panel-2);
+            background: #0b0b0b;
             border: 1px solid var(--border);
             border-radius: 16px;
             padding: 14px;
             display: flex;
             flex-direction: column;
             gap: 10px;
+            box-shadow: var(--glow);
           }
 
           .target-header {
@@ -188,20 +196,35 @@
 
           .btn {
             padding: 8px 12px;
-            border-radius: 10px;
+            border-radius: 12px;
             border: 1px solid var(--border);
-            background: var(--panel-3);
+            background: #0e0e0e;
             color: var(--text);
             cursor: pointer;
             font-size: 12px;
             transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
           }
 
           .btn.primary {
             background: linear-gradient(135deg, var(--accent), var(--accent-2));
             border: none;
-            color: #0b0f17;
+            color: #030303;
             font-weight: 600;
+          }
+
+          .icon {
+            width: 14px;
+            height: 14px;
+            display: inline-block;
+          }
+
+          .icon svg {
+            width: 100%;
+            height: 100%;
+            fill: currentColor;
           }
 
           .btn:hover {
@@ -220,8 +243,8 @@
             align-items: center;
             padding: 18px 26px;
             border-bottom: 1px solid var(--border);
-            background: rgba(15, 23, 42, 0.9);
-            backdrop-filter: blur(12px);
+            background: var(--glass);
+            backdrop-filter: blur(16px);
           }
 
           .topbar .left {
@@ -251,12 +274,12 @@
             padding: 12px 18px;
             border-bottom: 1px solid var(--border);
             overflow-x: auto;
-            background: var(--panel-2);
+            background: #0a0a0a;
           }
 
           .session-tab {
             border: 1px solid transparent;
-            background: var(--panel-3);
+            background: #0f0f0f;
             color: var(--muted);
             padding: 8px 12px;
             border-radius: 12px;
@@ -265,6 +288,7 @@
             align-items: center;
             gap: 8px;
             cursor: pointer;
+            transition: all 0.2s ease;
           }
 
           .session-tab.active {
@@ -284,13 +308,14 @@
           }
 
           .grid-stack-item-content {
-            background: var(--panel-2);
+            background: #080808;
             border: 1px solid var(--border);
-            border-radius: 14px;
+            border-radius: 16px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
             height: 100%;
+            box-shadow: var(--glow);
           }
 
           .tile-header {
@@ -298,9 +323,39 @@
             justify-content: space-between;
             align-items: center;
             padding: 10px 14px;
-            background: rgba(15, 23, 42, 0.8);
+            background: rgba(10, 10, 10, 0.9);
             border-bottom: 1px solid var(--border);
-            cursor: move;
+            cursor: grab;
+          }
+
+          .tile-header:active {
+            cursor: grabbing;
+          }
+
+          .traffic-lights {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-right: 8px;
+          }
+
+          .traffic-lights span {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            display: inline-block;
+          }
+
+          .traffic-lights .close {
+            background: #ff5f57;
+          }
+
+          .traffic-lights .min {
+            background: #febc2e;
+          }
+
+          .traffic-lights .max {
+            background: #28c840;
           }
 
           .tile-header h4 {
@@ -324,6 +379,8 @@
             border: none;
             cursor: pointer;
             font-size: 14px;
+            padding: 4px;
+            border-radius: 8px;
           }
 
           .tile-actions button:hover {
@@ -333,11 +390,18 @@
           .terminal-surface {
             flex: 1;
             padding: 10px;
+            background: #000;
+          }
+
+          .terminal-surface .xterm,
+          .terminal-surface .xterm-viewport,
+          .terminal-surface .xterm-screen {
+            height: 100%;
           }
 
           .tile-active .grid-stack-item-content {
             border-color: var(--accent);
-            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3);
+            box-shadow: 0 0 0 1px rgba(100, 210, 255, 0.35), 0 12px 32px rgba(0, 0, 0, 0.45);
           }
 
           .empty-state {
@@ -353,7 +417,7 @@
             bottom: 24px;
             padding: 12px 16px;
             border-radius: 12px;
-            background: var(--panel-2);
+            background: #0c0c0c;
             border: 1px solid var(--border);
             color: var(--text);
             font-size: 12px;
@@ -406,8 +470,24 @@
                 <span id="summaryText">Loading targets...</span>
               </div>
               <div class="topbar-actions">
-                <button class="btn" id="refreshBtn">Refresh Targets</button>
-                <button class="btn primary" id="newSessionBtn">New Terminal</button>
+                <button class="btn" id="refreshBtn">
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path
+                        d="M12 5a7 7 0 0 1 6.54 4.5h-2.1a5 5 0 1 0 0 5h2.1A7 7 0 1 1 12 5Zm7 0V2l3 3-3 3V5Z"
+                      />
+                    </svg>
+                  </span>
+                  Refresh Targets
+                </button>
+                <button class="btn primary" id="newSessionBtn">
+                  <span class="icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24">
+                      <path d="M11 5h2v14h-2zM5 11h14v2H5z" />
+                    </svg>
+                  </span>
+                  New Terminal
+                </button>
               </div>
             </div>
 
@@ -439,7 +519,7 @@
                   margin: 10,
                   float: true,
                   cellHeight: 180,
-                  draggable: { handle: '.tile-header' },
+                  draggable: { handle: '.tile-header', cancel: '.tile-actions button' },
                   resizable: { handles: 'all' },
                 },
                 '#grid'
@@ -570,12 +650,13 @@
                 button.addEventListener('click', () => {
                   const target = this.targets.find((t) => t.id === button.dataset.id);
                   if (!target) return;
-                  this.openTerminal(target);
+                  const isSplit = button.dataset.action === 'open-split';
+                  this.openTerminal(target, isSplit ? { w: 3, h: 4 } : undefined);
                 });
               });
             }
 
-            openTerminal(target) {
+            openTerminal(target, layout) {
               if (!target.host) {
                 this.toast('Target has no reachable host/IP.');
                 return;
@@ -589,6 +670,7 @@
                   JSON.stringify({
                     type: 'open',
                     targetId: target.id,
+                    sessionId,
                     cols: 80,
                     rows: 24,
                   })
@@ -623,25 +705,44 @@
                 <div class="grid-stack-item-content">
                   <div class="tile-header">
                     <div>
+                      <div class="traffic-lights" aria-hidden="true">
+                        <span class="close"></span>
+                        <span class="min"></span>
+                        <span class="max"></span>
+                      </div>
                       <h4>${target.name}</h4>
                       <span>${target.ip || target.host} · ${target.type.toUpperCase()}</span>
                     </div>
                     <div class="tile-actions">
-                      <button title="Focus" data-action="focus">⌖</button>
-                      <button title="Close" data-action="close">×</button>
+                      <button title="Focus" data-action="focus">
+                        <span class="icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M7 3h10v2H7zM3 7h2v10H3zm16 0h2v10h-2zM7 19h10v2H7z" />
+                          </svg>
+                        </span>
+                      </button>
+                      <button title="Close" data-action="close">
+                        <span class="icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M6 6l12 12M18 6l-12 12" stroke="currentColor" stroke-width="2" fill="none" />
+                          </svg>
+                        </span>
+                      </button>
                     </div>
                   </div>
                   <div class="terminal-surface" id="terminal-${sessionId}"></div>
                 </div>
               `;
 
-              this.grid.addWidget(tile, { w: 6, h: 4, minW: 3, minH: 2 });
+              this.grid.addWidget(tile, { w: layout?.w || 6, h: layout?.h || 4, minW: 3, minH: 2 });
 
-              tile.querySelector('[data-action="close"]').addEventListener('click', () => {
+              tile.querySelector('[data-action="close"]').addEventListener('click', (event) => {
+                event.stopPropagation();
                 this.closeTerminal(sessionId);
               });
 
-              tile.querySelector('[data-action="focus"]').addEventListener('click', () => {
+              tile.querySelector('[data-action="focus"]').addEventListener('click', (event) => {
+                event.stopPropagation();
                 this.focusSession(sessionId);
               });
 
@@ -650,9 +751,9 @@
                 cursorBlink: true,
                 fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                 theme: {
-                  background: '#0b0f17',
-                  foreground: '#e5e7eb',
-                  cursor: '#38bdf8',
+                  background: '#000000',
+                  foreground: '#f5f5f7',
+                  cursor: '#64d2ff',
                 },
               });
 

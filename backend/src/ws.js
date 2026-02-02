@@ -13,8 +13,11 @@ class TerminalManager {
     this.wsConnections = new Map(); // ws -> sessionId
   }
 
-  createSession(target) {
-    const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  createSession(target, preferredSessionId) {
+    let sessionId = preferredSessionId;
+    while (!sessionId || this.sessions.has(sessionId)) {
+      sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    }
 
     const session = new RealSSHSession(config);
 
@@ -42,7 +45,7 @@ class TerminalManager {
 
           if (msg.type === 'open') {
             // Open new SSH terminal
-            const { targetId, cols, rows } = msg;
+            const { targetId, cols, rows, sessionId: preferredSessionId } = msg;
             const target = await targetService.getTargetById(targetId);
             if (!target) {
               ws.send(
@@ -54,7 +57,7 @@ class TerminalManager {
               return;
             }
 
-            const { sessionId, session } = this.createSession(target);
+            const { sessionId, session } = this.createSession(target, preferredSessionId);
 
             this.wsConnections.set(ws, sessionId);
 
