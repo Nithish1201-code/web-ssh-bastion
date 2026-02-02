@@ -21,6 +21,8 @@ class RealSSHSession extends EventEmitter {
     return new Promise((resolve, reject) => {
       this.sshClient = new SSHClient();
 
+      const resolvedHost = target.ip || target.host;
+
       const acceptHostKey = auth.acceptHostKey === true;
       const password = auth.password || '';
       const hasKey = this.config.sshKeyPath && fs.existsSync(this.config.sshKeyPath);
@@ -29,7 +31,7 @@ class RealSSHSession extends EventEmitter {
         const error = new Error('Missing SSH credentials: provide password or SSH key.');
         error.code = 'NO_AUTH';
         console.error('[SSH] Missing credentials', {
-          host: target.host,
+          host: resolvedHost,
           user: this.config.sshUser,
           hasKey,
         });
@@ -41,7 +43,7 @@ class RealSSHSession extends EventEmitter {
       let hostKeyRejected = false;
       const hostVerifier = (key) => {
         if (acceptHostKey) {
-          console.log('[SSH] Host key accepted via prompt', { host: target.host });
+          console.log('[SSH] Host key accepted via prompt', { host: resolvedHost });
           return true;
         }
         if (!hostKeyRejected) {
@@ -50,7 +52,7 @@ class RealSSHSession extends EventEmitter {
           error.code = 'HOSTKEY';
           error.fingerprint = fingerprint;
           console.warn('[SSH] Host key not accepted yet', {
-            host: target.host,
+            host: resolvedHost,
             fingerprint,
           });
           hostKeyRejected = true;
@@ -61,7 +63,7 @@ class RealSSHSession extends EventEmitter {
 
       // SSH connection options
       const sshConfig = {
-        host: target.host,
+        host: resolvedHost,
         port: this.config.sshPort,
         username: this.config.sshUser,
         hostVerifier,
@@ -88,7 +90,7 @@ class RealSSHSession extends EventEmitter {
 
       this.sshClient.on('ready', () => {
         this.connected = true;
-        console.log('[SSH] Ready', { host: target.host });
+        console.log('[SSH] Ready', { host: resolvedHost });
         this.sshClient.shell(
           {
             term: 'xterm-256color',
@@ -97,7 +99,7 @@ class RealSSHSession extends EventEmitter {
           },
           (err, stream) => {
             if (err) {
-              console.error('[SSH] Shell error', { host: target.host, error: err.message });
+              console.error('[SSH] Shell error', { host: resolvedHost, error: err.message });
               this.emit('error', err);
               reject(err);
               return;
@@ -106,7 +108,7 @@ class RealSSHSession extends EventEmitter {
             stream.on('data', (data) => this.emit('data', data));
             stream.on('close', () => {
               this.connected = false;
-              console.log('[SSH] Stream closed', { host: target.host });
+              console.log('[SSH] Stream closed', { host: resolvedHost });
               this.emit('close');
             });
             this.emit('ready');
@@ -116,14 +118,14 @@ class RealSSHSession extends EventEmitter {
       });
 
       this.sshClient.on('error', (err) => {
-        console.error('[SSH] Client error', { host: target.host, error: err.message });
+        console.error('[SSH] Client error', { host: resolvedHost, error: err.message });
         this.emit('error', err);
         reject(err);
       });
 
       this.sshClient.on('close', () => {
         this.connected = false;
-        console.log('[SSH] Connection closed', { host: target.host });
+        console.log('[SSH] Connection closed', { host: resolvedHost });
         this.emit('close');
       });
 
