@@ -178,13 +178,16 @@ async function ensureEnvConfig() {
     proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
   }
 
-  const permissionsPrompt = `\nApply these Proxmox permissions before continuing:\n` +
-    `  pveum user token add ${proxmoxUser} ${tokenName || '<token>'} -privsep 1\n` +
-    `  pveum aclmod / -token '${proxmoxUser}!${tokenName || '<token>'}' -role PVEAuditor\n` +
-    `\nHave you run the commands above? (y/n)`;
-  const permsConfirmed = await askForValue(permissionsPrompt, 'n', validateYesNo);
-  if (permsConfirmed.toLowerCase() !== 'y') {
-    throw new Error('Proxmox permissions not confirmed. Aborting setup.');
+  while (true) {
+    const permissionsPrompt = `\nApply these Proxmox permissions before continuing:\n` +
+      `  pveum user token add ${proxmoxUser} ${tokenName || '<token>'} -privsep 1\n` +
+      `  pveum aclmod / -token '${proxmoxUser}!${tokenName || '<token>'}' -role PVEAuditor\n` +
+      `\nHave you run the commands above? (y/n)`;
+    const permsConfirmed = await askForValue(permissionsPrompt, 'n', validateYesNo);
+    if (permsConfirmed.toLowerCase() === 'y') {
+      break;
+    }
+    console.log('Run the commands, then confirm to continue.');
   }
 
   const useWebAuth = await askForValue('Use password auth for web UI? (y/n)', defaults.WEB_AUTH_ENABLED === '1' ? 'y' : 'n', validateYesNo);
@@ -212,7 +215,25 @@ async function ensureEnvConfig() {
     WEB_AUTH_PASS: webAuthPass,
   };
 
-  await testProxmoxConnection(values);
+  while (true) {
+    try {
+      await testProxmoxConnection(values);
+      break;
+    } catch (error) {
+      console.error(`Proxmox API test failed: ${error.message}`);
+      const retry = await askForValue('Retry Proxmox API test? (y/n)', 'y', validateYesNo);
+      if (retry.toLowerCase() !== 'y') {
+        throw new Error('Proxmox API verification failed. Aborting setup.');
+      }
+
+      const reenter = await askForValue('Re-enter token name/secret? (y/n)', 'y', validateYesNo);
+      if (reenter.toLowerCase() === 'y') {
+        tokenName = await askForValue('Proxmox token name', tokenName || '', validateTokenPart);
+        const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
+        values.PROXMOX_API_TOKEN = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+      }
+    }
+  }
 
   writeEnvFile(values);
   Object.entries(values).forEach(([key, value]) => {
