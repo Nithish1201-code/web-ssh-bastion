@@ -42,12 +42,25 @@ class TerminalManager {
       ws.on('message', async (message) => {
         try {
           const msg = JSON.parse(message);
+          if (msg?.type && msg?.targetId) {
+            console.log('[WS] Message', { type: msg.type, targetId: msg.targetId, sessionId: msg.sessionId });
+          } else if (msg?.type) {
+            console.log('[WS] Message', { type: msg.type, sessionId: msg.sessionId });
+          }
 
           if (msg.type === 'open') {
             // Open new SSH terminal
             const { targetId, cols, rows, sessionId: preferredSessionId, password, acceptHostKey } = msg;
+            console.log('[WS] Open terminal request', {
+              targetId,
+              cols,
+              rows,
+              hasPassword: Boolean(password),
+              acceptHostKey: Boolean(acceptHostKey),
+            });
             const target = await targetService.getTargetById(targetId);
             if (!target) {
+              console.warn('[WS] Target not found', { targetId });
               ws.send(
                 JSON.stringify({
                   type: 'error',
@@ -58,6 +71,7 @@ class TerminalManager {
             }
 
             const { sessionId, session } = this.createSession(target, preferredSessionId);
+            console.log('[WS] Session created', { sessionId, targetId: target.id });
 
             this.wsConnections.set(ws, sessionId);
 
@@ -109,6 +123,7 @@ class TerminalManager {
             });
 
             await session.connect(target, { password, acceptHostKey });
+            console.log('[WS] Session connect resolved', { sessionId, targetId: target.id });
           } else if (msg.type === 'input') {
             // Send input to SSH session
             const { sessionId, data } = msg;
@@ -130,6 +145,7 @@ class TerminalManager {
           }
         } catch (err) {
           console.error('WebSocket message error:', err);
+          console.error('[WS] Raw message:', message.toString());
           ws.send(
             JSON.stringify({
               type: 'error',
@@ -143,6 +159,7 @@ class TerminalManager {
         console.log('WebSocket client disconnected');
         const sessionId = this.wsConnections.get(ws);
         if (sessionId) {
+          console.log('[WS] Closing session from socket close', { sessionId });
           this.removeSession(sessionId);
           this.wsConnections.delete(ws);
         }
