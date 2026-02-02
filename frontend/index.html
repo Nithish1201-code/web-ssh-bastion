@@ -12,11 +12,13 @@
         />
         <link
           rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/xterm@5.5.0/css/xterm.min.css"
+          href="/vendor/xterm.css"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css'"
         />
         <link
           rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css"
+          href="/vendor/gridstack.min.css"
+          onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack.min.css'"
         />
         <style>
           :root {
@@ -595,9 +597,9 @@
           <div class="debug-log" id="debugLog"></div>
         </div>
 
-        <script src="https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/xterm@5.5.0/lib/xterm.min.js"></script>
-        <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+        <script src="/vendor/gridstack-all.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/gridstack@10.3.1/dist/gridstack-all.js'"></script>
+        <script src="/vendor/xterm.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js'"></script>
+        <script src="/vendor/xterm-addon-fit.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js'"></script>
         <script>
           class TerminalApp {
             constructor() {
