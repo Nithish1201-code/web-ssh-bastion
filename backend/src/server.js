@@ -1,8 +1,6 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
-const fs = require('fs');
-const crypto = require('crypto');
 const { execSync } = require('child_process');
 const config = require('./config');
 const terminalManager = require('./ws');
@@ -12,90 +10,10 @@ const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 const app = express();
 app.set('trust proxy', true);
 const server = http.createServer(app);
-const ENV_PATH = path.join(__dirname, '../../.env');
-
-const readEnvValue = (content, key) => {
-  const lines = content.split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [currentKey, ...rest] = trimmed.split('=');
-    if (currentKey === key && rest.length) {
-      return rest.join('=').trim();
-    }
-  }
-  return '';
-};
-
-const ensureWebAuthSecret = () => {
-  if (process.env.WEB_AUTH_SECRET) return process.env.WEB_AUTH_SECRET;
-
-  try {
-    if (fs.existsSync(ENV_PATH)) {
-      const envContent = fs.readFileSync(ENV_PATH, 'utf8');
-      const existing = readEnvValue(envContent, 'WEB_AUTH_SECRET');
-      if (existing) {
-        process.env.WEB_AUTH_SECRET = existing;
-        return existing;
-      }
-    }
-  } catch (error) {
-    // ignore env read errors
-  }
-
-  const generated = crypto.randomBytes(32).toString('hex');
-  process.env.WEB_AUTH_SECRET = generated;
-  try {
-    const prefix = fs.existsSync(ENV_PATH) ? '\n' : '';
-    fs.appendFileSync(ENV_PATH, `${prefix}WEB_AUTH_SECRET=${generated}\n`, 'utf8');
-  } catch (error) {
-    // ignore env write errors
-  }
-  return generated;
-};
-
-const sessionSecret = ensureWebAuthSecret();
+const authEnabled = config.webAuthEnabled;
 
 // Middleware
 app.use(express.json());
-
-const parseCookies = (cookieHeader = '') =>
-  cookieHeader
-    .split(';')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .reduce((acc, part) => {
-      const [key, ...rest] = part.split('=');
-      if (!key) return acc;
-      acc[key] = rest.join('=');
-      return acc;
-    }, {});
-
-const signToken = (token) =>
-  crypto.createHmac('sha256', sessionSecret).update(token).digest('hex');
-
-const verifyToken = (token, sig) => {
-  if (!token || !sig) return false;
-  const expected = signToken(token);
-  try {
-    return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(sig));
-  } catch (error) {
-    return false;
-  }
-};
-
-const buildSessionCookie = (req, token) => {
-  const sig = signToken(token);
-  const forwarded = req.headers['x-forwarded-proto'];
-  const forwardedValue = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-  const proto = (forwardedValue || req.protocol || '').split(',')[0].trim().toLowerCase();
-  const isHttps = proto === 'https';
-  const secure = isHttps ? ' Secure;' : '';
-  const sameSite = isHttps ? 'SameSite=None;' : 'SameSite=Lax;';
-  return `webssh_session=${token}.${sig}; HttpOnly; ${sameSite} Path=/; Max-Age=86400;${secure}`;
-};
-
-const authEnabled = config.webAuthEnabled;
 
 if (authEnabled) {
   app.post('/login', (req, res) => {
@@ -111,48 +29,11 @@ if (authEnabled) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const token = crypto.randomBytes(24).toString('hex');
-    res.setHeader('Set-Cookie', buildSessionCookie(req, token));
-    return res.json({ ok: true, token });
-  });
-
-  app.post('/logout', (req, res) => {
-    const cookies = parseCookies(req.headers.cookie || '');
-    res.setHeader('Set-Cookie', 'webssh_session=; Max-Age=0; Path=/');
     return res.json({ ok: true });
   });
 
-  app.use((req, res, next) => {
-    if (req.path === '/login') return next();
-    if (req.path === '/login.html') return next();
-    if (req.path.startsWith('/vendor/')) return next();
-    if (req.path.endsWith('.css') || req.path.endsWith('.js') || req.path.endsWith('.svg')) return next();
-
-    if (req.query?.session) {
-      const sessionToken = req.query.session;
-      res.setHeader('Set-Cookie', buildSessionCookie(req, sessionToken));
-      return res.redirect('/');
-    }
-
-    const cookies = parseCookies(req.headers.cookie || '');
-    if (cookies.webssh_session) {
-      const rawValue = decodeURIComponent(cookies.webssh_session);
-      if (rawValue.includes('.')) {
-        const [token, sig] = rawValue.split('.');
-        if (verifyToken(token, sig)) {
-          return next();
-        }
-      } else {
-        res.setHeader('Set-Cookie', buildSessionCookie(req, rawValue));
-        return next();
-      }
-    }
-
-    if (req.path.startsWith('/api/')) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-
-    return res.sendFile(path.join(__dirname, '../../frontend/login.html'));
+  app.post('/logout', (req, res) => {
+    return res.json({ ok: true });
   });
 }
 app.use(express.static(path.join(__dirname, '../../frontend')));
