@@ -76,6 +76,10 @@ function validateBooleanFlag(value) {
   return ['0', '1'].includes(value) ? true : 'Use 0 or 1.';
 }
 
+function validateYesNo(value) {
+  return ['y', 'n'].includes(value.toLowerCase()) ? true : 'Use y or n.';
+}
+
 function validateUrl(value) {
   if (!value) return true;
   try {
@@ -159,15 +163,36 @@ async function ensureEnvConfig() {
     PROXMOX_API_INSECURE: existing.PROXMOX_API_INSECURE || '1',
     PROXMOX_NODE: existing.PROXMOX_NODE || '',
     SSH_TARGETS: existing.SSH_TARGETS || '[]',
+    WEB_AUTH_ENABLED: existing.WEB_AUTH_ENABLED || '0',
+    WEB_AUTH_USER: existing.WEB_AUTH_USER || '',
+    WEB_AUTH_PASS: existing.WEB_AUTH_PASS || '',
   };
 
   const proxmoxUser = await askForValue('Proxmox user', defaults.PROXMOX_USER, validateNonEmpty);
 
   let proxmoxToken = defaults.PROXMOX_API_TOKEN;
+  let tokenName = '';
   if (!proxmoxToken) {
-    const tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
+    tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
     const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
     proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+  }
+
+  const permissionsPrompt = `\nApply these Proxmox permissions before continuing:\n` +
+    `  pveum user token add ${proxmoxUser} ${tokenName || '<token>'} -privsep 1\n` +
+    `  pveum aclmod / -token '${proxmoxUser}!${tokenName || '<token>'}' -role PVEAuditor\n` +
+    `\nHave you run the commands above? (y/n)`;
+  const permsConfirmed = await askForValue(permissionsPrompt, 'n', validateYesNo);
+  if (permsConfirmed.toLowerCase() !== 'y') {
+    throw new Error('Proxmox permissions not confirmed. Aborting setup.');
+  }
+
+  const useWebAuth = await askForValue('Use password auth for web UI? (y/n)', defaults.WEB_AUTH_ENABLED === '1' ? 'y' : 'n', validateYesNo);
+  let webAuthUser = defaults.WEB_AUTH_USER;
+  let webAuthPass = defaults.WEB_AUTH_PASS;
+  if (useWebAuth.toLowerCase() === 'y') {
+    webAuthUser = await askForValue('Web UI username', webAuthUser, validateNonEmpty);
+    webAuthPass = await askForValue('Web UI password', webAuthPass, validateNonEmpty);
   }
 
   const values = {
@@ -182,6 +207,9 @@ async function ensureEnvConfig() {
     PROXMOX_API_INSECURE: await askForValue('Allow insecure TLS (0 or 1)', defaults.PROXMOX_API_INSECURE, validateBooleanFlag),
     PROXMOX_NODE: await askForValue('Proxmox node (optional)', defaults.PROXMOX_NODE),
     SSH_TARGETS: await askForValue('SSH targets JSON (optional)', defaults.SSH_TARGETS),
+    WEB_AUTH_ENABLED: useWebAuth.toLowerCase() === 'y' ? '1' : '0',
+    WEB_AUTH_USER: webAuthUser,
+    WEB_AUTH_PASS: webAuthPass,
   };
 
   await testProxmoxConnection(values);

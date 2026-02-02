@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const crypto = require('crypto');
 const { execSync } = require('child_process');
 const config = require('./config');
 const terminalManager = require('./ws');
@@ -9,9 +10,69 @@ const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 
 const app = express();
 const server = http.createServer(app);
+const sessions = new Map();
 
 // Middleware
 app.use(express.json());
+
+const parseCookies = (cookieHeader = '') =>
+  cookieHeader
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .reduce((acc, part) => {
+      const [key, ...rest] = part.split('=');
+      if (!key) return acc;
+      acc[key] = rest.join('=');
+      return acc;
+    }, {});
+
+const authEnabled = config.webAuthEnabled;
+
+if (authEnabled) {
+  app.post('/login', (req, res) => {
+    const { username, password } = req.body || {};
+    const expectedUser = config.webAuthUser || '';
+    const expectedPass = config.webAuthPass || '';
+
+    if (!expectedUser || !expectedPass) {
+      return res.status(500).json({ error: 'Auth misconfigured' });
+    }
+
+    if (username !== expectedUser || password !== expectedPass) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    const token = crypto.randomBytes(24).toString('hex');
+    sessions.set(token, { createdAt: Date.now() });
+    res.setHeader('Set-Cookie', `webssh_session=${token}; HttpOnly; SameSite=Lax; Path=/`);
+    return res.json({ ok: true });
+  });
+
+  app.post('/logout', (req, res) => {
+    const cookies = parseCookies(req.headers.cookie || '');
+    if (cookies.webssh_session) {
+      sessions.delete(cookies.webssh_session);
+    }
+    res.setHeader('Set-Cookie', 'webssh_session=; Max-Age=0; Path=/');
+    return res.json({ ok: true });
+  });
+
+  app.use((req, res, next) => {
+    if (req.path === '/login') return next();
+    if (req.path === '/login.html') return next();
+
+    const cookies = parseCookies(req.headers.cookie || '');
+    const session = cookies.webssh_session && sessions.get(cookies.webssh_session);
+    if (session) return next();
+
+    if (req.path.startsWith('/api/')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    return res.sendFile(path.join(__dirname, '../../frontend/login.html'));
+  });
+}
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
 // API Routes
