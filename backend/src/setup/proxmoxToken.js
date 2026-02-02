@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
+const { execFile } = require('child_process');
 const config = require('../config');
 
 const ENV_PATH = path.resolve(__dirname, '../../.env');
@@ -98,6 +99,37 @@ function buildTokenValue(user, tokenName, tokenSecret) {
   return `${user}!${tokenName}=${tokenSecret}`;
 }
 
+function normalizeUser(value) {
+  if (!value) return value;
+  if (value.includes('@')) return value;
+  return `${value}@pam`;
+}
+
+function parseTokenInput(input) {
+  if (!input) return null;
+  const trimmed = input.trim();
+  if (trimmed.startsWith('PVEAPIToken=')) {
+    return trimmed.replace(/^PVEAPIToken=/, '');
+  }
+  return trimmed.includes('!') && trimmed.includes('=') ? trimmed : null;
+}
+
+async function runPermissions(user, tokenName) {
+  await new Promise((resolve, reject) => {
+    execFile('pveum', ['user', 'token', 'add', user, tokenName, '-privsep', '1'], (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(stdout);
+    });
+  });
+
+  await new Promise((resolve, reject) => {
+    execFile('pveum', ['aclmod', '/', '-token', `${user}!${tokenName}`, '-role', 'PVEAuditor'], (err, stdout, stderr) => {
+      if (err) return reject(new Error(stderr || err.message));
+      resolve(stdout);
+    });
+  });
+}
+
 function getDispatcher(allowInsecure) {
   if (!allowInsecure) return undefined;
   try {
@@ -168,14 +200,20 @@ async function ensureEnvConfig() {
     WEB_AUTH_PASS: existing.WEB_AUTH_PASS || '',
   };
 
-  const proxmoxUser = await askForValue('Proxmox user', defaults.PROXMOX_USER, validateNonEmpty);
+  const proxmoxUser = normalizeUser(await askForValue('Proxmox user', defaults.PROXMOX_USER, validateNonEmpty));
 
   let proxmoxToken = defaults.PROXMOX_API_TOKEN;
   let tokenName = '';
   if (!proxmoxToken) {
-    tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
-    const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
-    proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+    const maybeToken = await askForValue('Proxmox API token (or leave blank to enter name/secret)', '');
+    const parsed = parseTokenInput(maybeToken);
+    if (parsed) {
+      proxmoxToken = parsed;
+    } else {
+      tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
+      const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
+      proxmoxToken = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+    }
   }
 
   while (true) {
@@ -185,7 +223,22 @@ async function ensureEnvConfig() {
       `\nHave you run the commands above? (y/n)`;
     const permsConfirmed = await askForValue(permissionsPrompt, 'n', validateYesNo);
     if (permsConfirmed.toLowerCase() === 'y') {
+      console.log(`Using API token: PVEAPIToken=${proxmoxToken}`);
       break;
+    }
+    const runNow = await askForValue('Run the commands now? (y/n)', 'y', validateYesNo);
+    if (runNow.toLowerCase() === 'y') {
+      if (!tokenName) {
+        tokenName = await askForValue('Proxmox token name', '', validateTokenPart);
+      }
+      try {
+        await runPermissions(proxmoxUser, tokenName);
+        console.log('Permissions applied.');
+        console.log(`Using API token: PVEAPIToken=${proxmoxToken}`);
+        break;
+      } catch (error) {
+        console.error(`Failed to apply permissions: ${error.message}`);
+      }
     }
     console.log('Run the commands, then confirm to continue.');
   }
@@ -231,6 +284,7 @@ async function ensureEnvConfig() {
         tokenName = await askForValue('Proxmox token name', tokenName || '', validateTokenPart);
         const tokenSecret = await askForValue('Proxmox token secret', '', validateTokenPart);
         values.PROXMOX_API_TOKEN = buildTokenValue(proxmoxUser, tokenName, tokenSecret);
+        console.log(`Using API token: PVEAPIToken=${values.PROXMOX_API_TOKEN}`);
       }
     }
   }
