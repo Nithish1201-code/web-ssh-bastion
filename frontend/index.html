@@ -835,6 +835,14 @@
             }
 
             openTerminal(target, layout, retryState = {}) {
+              if (!window.Terminal || !window.FitAddon?.FitAddon) {
+                this.toast('Terminal engine failed to load. Check network or CDN.');
+                this.logDebug('Terminal engine missing', {
+                  terminal: !!window.Terminal,
+                  fitAddon: !!window.FitAddon?.FitAddon,
+                });
+                return;
+              }
               if (target.status !== 'running') {
                 this.toast('Target is offline.');
                 return;
@@ -988,7 +996,10 @@
               let term;
               let fitAddon;
               try {
-                term = new Terminal({
+                if (!window.Terminal) {
+                  throw new Error('xterm.js failed to load');
+                }
+                term = new window.Terminal({
                   cursorBlink: true,
                   fontFamily: 'Monaco, Menlo, Ubuntu Mono, monospace',
                   theme: {
@@ -998,7 +1009,7 @@
                   },
                 });
 
-                fitAddon = new FitAddon.FitAddon();
+                fitAddon = new window.FitAddon.FitAddon();
                 term.loadAddon(fitAddon);
                 term.open(terminalEl);
                 fitAddon.fit();
