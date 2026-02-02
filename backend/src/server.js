@@ -9,6 +9,7 @@ const targetService = require('./proxmox');
 const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 
 const app = express();
+app.set('trust proxy', true);
 const server = http.createServer(app);
 const sessionSecret = process.env.WEB_AUTH_SECRET || crypto.randomBytes(32).toString('hex');
 
@@ -40,9 +41,12 @@ const verifyToken = (token, sig) => {
   }
 };
 
-const buildSessionCookie = (token) => {
+const buildSessionCookie = (req, token) => {
   const sig = signToken(token);
-  return `webssh_session=${token}.${sig}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`;
+  const proto = req.headers['x-forwarded-proto'] || req.protocol;
+  const secure = proto === 'https' ? ' Secure;' : '';
+  const sameSite = proto === 'https' ? 'SameSite=None;' : 'SameSite=Lax;';
+  return `webssh_session=${token}.${sig}; HttpOnly; ${sameSite} Path=/; Max-Age=86400;${secure}`;
 };
 
 const authEnabled = config.webAuthEnabled;
@@ -62,7 +66,7 @@ if (authEnabled) {
     }
 
     const token = crypto.randomBytes(24).toString('hex');
-    res.setHeader('Set-Cookie', buildSessionCookie(token));
+    res.setHeader('Set-Cookie', buildSessionCookie(req, token));
     return res.json({ ok: true, token });
   });
 
@@ -80,7 +84,7 @@ if (authEnabled) {
 
     if (req.query?.session) {
       const sessionToken = req.query.session;
-      res.setHeader('Set-Cookie', buildSessionCookie(sessionToken));
+      res.setHeader('Set-Cookie', buildSessionCookie(req, sessionToken));
       return res.redirect('/');
     }
 
@@ -93,7 +97,7 @@ if (authEnabled) {
           return next();
         }
       } else {
-        res.setHeader('Set-Cookie', buildSessionCookie(rawValue));
+        res.setHeader('Set-Cookie', buildSessionCookie(req, rawValue));
         return next();
       }
     }
