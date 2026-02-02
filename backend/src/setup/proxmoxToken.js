@@ -155,9 +155,6 @@ function getDispatcher(allowInsecure) {
 }
 
 async function testProxmoxConnection(values) {
-  const url = new URL(values.PROXMOX_API_URL);
-  url.pathname = `${url.pathname.replace(/\/$/, '')}/version`;
-
   const allowInsecure = values.PROXMOX_API_INSECURE === '1';
   const dispatcher = getDispatcher(allowInsecure);
   const previousReject = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
@@ -166,7 +163,13 @@ async function testProxmoxConnection(values) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
   }
 
-  try {
+  const buildUrl = (base) => {
+    const url = new URL(base);
+    url.pathname = `${url.pathname.replace(/\/$/, '')}/version`;
+    return url;
+  };
+
+  const attempt = async (url) => {
     const response = await fetch(url.toString(), {
       headers: {
         Authorization: `PVEAPIToken=${values.PROXMOX_API_TOKEN}`,
@@ -181,6 +184,21 @@ async function testProxmoxConnection(values) {
     }
 
     await response.json();
+  };
+
+  try {
+    const primaryUrl = buildUrl(values.PROXMOX_API_URL);
+    try {
+      await attempt(primaryUrl);
+    } catch (error) {
+      if (primaryUrl.protocol === 'http:') {
+        const httpsUrl = new URL(primaryUrl.toString());
+        httpsUrl.protocol = 'https:';
+        await attempt(httpsUrl);
+      } else {
+        throw error;
+      }
+    }
     console.log('Proxmox API token verified.');
   } finally {
     if (allowInsecure && !dispatcher) {
