@@ -1,6 +1,7 @@
 const express = require('express');
 const http = require('http');
 const path = require('path');
+const { execSync } = require('child_process');
 const config = require('./config');
 const terminalManager = require('./ws');
 const targetService = require('./proxmox');
@@ -31,6 +32,16 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     uptime: process.uptime(),
   });
+});
+
+app.get('/api/build', (req, res) => {
+  try {
+    const repoRoot = path.join(__dirname, '../..');
+    const build = execSync('git rev-list --count HEAD', { cwd: repoRoot, encoding: 'utf8' }).trim();
+    res.json({ build });
+  } catch (error) {
+    res.json({ build: 'unknown' });
+  }
 });
 
 app.post('/api/terminal', async (req, res) => {
