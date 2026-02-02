@@ -25,8 +25,11 @@ A fully working **self-hosted SSH terminal web app** with:
 ```bash
 cd backend
 npm install
-npm start
+npm run setup   # prompt for mock Proxmox token
+npm run dev     # nodemon-backed server
 ```
+
+The `npm run setup` command stores the mock Proxmox token (`31293e82-d7f9-45c0-83e1-0c7ba0579e36`) in `.env`, which the backend uses to fetch the dynamic CT/VM list.
 
 You'll see:
 

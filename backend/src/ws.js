@@ -2,6 +2,7 @@ const WebSocket = require('ws');
 const MockSSHSession = require('./ssh/mock');
 const RealSSHSession = require('./ssh/real');
 const config = require('./config');
+const targetService = require('./proxmox');
 
 /**
  * WebSocket Terminal Manager
@@ -13,12 +14,12 @@ class TerminalManager {
     this.wsConnections = new Map(); // ws -> sessionId
   }
 
-  createSession(targetId) {
+  createSession(target) {
     const sessionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     let session;
     if (config.sshMode === 'mock') {
-      session = new MockSSHSession();
+      session = new MockSSHSession(target);
     } else {
       session = new RealSSHSession(config);
     }
@@ -48,7 +49,18 @@ class TerminalManager {
           if (msg.type === 'open') {
             // Open new SSH terminal
             const { targetId, cols, rows } = msg;
-            const { sessionId, session } = this.createSession(targetId);
+            const target = await targetService.getTargetById(targetId);
+            if (!target) {
+              ws.send(
+                JSON.stringify({
+                  type: 'error',
+                  error: 'Target not found',
+                })
+              );
+              return;
+            }
+
+            const { sessionId, session } = this.createSession(target);
 
             this.wsConnections.set(ws, sessionId);
 
@@ -94,17 +106,6 @@ class TerminalManager {
 
             // For real SSH, connect to target
             if (config.sshMode === 'real') {
-              const target = config.targets.find((t) => t.id === targetId);
-              if (!target) {
-                ws.send(
-                  JSON.stringify({
-                    type: 'error',
-                    sessionId,
-                    error: 'Target not found',
-                  })
-                );
-                return;
-              }
               await session.connect(target);
             }
           } else if (msg.type === 'input') {

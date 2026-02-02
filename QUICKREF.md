@@ -6,15 +6,16 @@
 
 ```bash
 cd backend
-npm install
-npm start
+npm install           # installs deps and runs token setup
+npm run setup         # enter mock Proxmox token (default provided)
+npm run dev           # nodemon-backed dev server
 # Open: http://localhost:3000
 ```
 
 ### Production (Your CT)
 
 ```bash
-git clone https://github.com/your-username/web-ssh-bastion.git
+git clone https://github.com/Nithish1201-code/web-ssh-bastion.git
 cd web-ssh-bastion/backend
 cp .env.example .env
 nano .env  # Edit with real SSH key path + targets
@@ -49,6 +50,9 @@ SSH_KEY_PATH=/keys/id_ed25519
 SSH_PORT=22
 PORT=3000
 HOST=localhost
+PROXMOX_API_TOKEN=31293e82-d7f9-45c0-83e1-0c7ba0579e36
+PROXMOX_API_URL=https://proxmox.local/api2/json
+PROXMOX_USER=root@pam!sshbastion
 ```
 
 ### Targets (config.js)

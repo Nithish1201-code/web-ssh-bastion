@@ -1,0 +1,28 @@
+{
+  "name": "web-ssh-bastion",
+  "version": "1.0.0",
+  "description": "A self-hosted web application for opening browser-based SSH terminals to multiple Proxmox containers and VMs from one dashboard.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nithish1201-code/web-ssh-bastion.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Nithish1201-code/web-ssh-bastion/issues"
+  },
+  "homepage": "https://github.com/Nithish1201-code/web-ssh-bastion#readme",
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "node-pty": "^1.1.0",
+    "ssh2": "^1.17.0",
+    "ws": "^8.19.0"
+  }
+}

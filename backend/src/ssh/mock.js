@@ -6,16 +6,17 @@ const { EventEmitter } = require('events');
  * In Codespaces, we don't have SSH keys, so this mocks the behavior
  */
 class MockSSHSession extends EventEmitter {
-  constructor() {
+  constructor(target = {}) {
     super();
     this.commandHistory = [];
     this.connected = false;
+    this.target = target;
 
     // Simulate connection delay
     setTimeout(() => {
       this.connected = true;
       this.emit('ready');
-      this.emit('data', 'Welcome to Mock SSH Terminal\r\n');
+      this.emit('data', `Welcome to Mock SSH Terminal (${target.name || 'mock'})\r\n`);
       this.emit('data', '$ ');
     }, 100);
   }

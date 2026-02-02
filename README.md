@@ -39,10 +39,11 @@ web-ssh-bastion/
 cd /workspaces/web-ssh-bastion/backend
 
 # Install dependencies
-npm install
+npm install  # Install dependencies (runs setup script)
 
 # Start backend (mock mode by default)
-npm start
+npm run setup  # Prompt for mock Proxmox token & save to .env
+npm run dev    # Start backend (mock mode by default)
 ```
 
 ### 2. Access in Browser
@@ -70,6 +71,12 @@ SSH_PORT=22
 PORT=3000
 HOST=localhost
 ```
+
+### Proxmox API Token (Mock)
+
+Codespaces development uses a mock Proxmox API token. Run `npm run setup` after installing dependencies and enter the default token (`31293e82-d7f9-45c0-83e1-0c7ba0579e36`) when prompted. The script saves it to `.env` so the backend can fetch the mocked CTs/VMs via `/api/targets`.
+
+On your Proxmox control node, create an `.env` with your real token/URL and rerun `npm run setup` if you need to refresh the stored value.
 
 ### Mock vs Real Mode
 

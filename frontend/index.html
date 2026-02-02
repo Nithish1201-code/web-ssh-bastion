@@ -49,17 +49,50 @@
       .target-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 12px;
+      }
+
+      .target-card {
+        padding: 12px;
+        background: #1f1f23;
+        border-radius: 8px;
+        border: 1px solid #3f3f45;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .target-card__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .target-card__name {
+        font-size: 14px;
+        font-weight: bold;
+        color: #ffffff;
+      }
+
+      .target-card__meta {
+        font-size: 11px;
+        color: #909090;
+        margin-top: 2px;
+      }
+
+      .target-card__actions {
+        display: flex;
+        justify-content: flex-end;
       }
 
       .target-btn {
-        padding: 10px 12px;
+        padding: 8px 12px;
         background: #2d2d30;
         border: 1px solid #3e3e42;
         color: #cccccc;
         cursor: pointer;
         border-radius: 3px;
-        font-size: 13px;
+        font-size: 12px;
         transition: all 0.2s;
       }
 
@@ -67,6 +100,24 @@
         background: #3e3e42;
         border-color: #007acc;
         color: #ffffff;
+      }
+
+      .target-status {
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+      }
+
+      .target-status.running {
+        background: #0c3;
+        color: #0f0;
+      }
+
+      .target-status.stopped {
+        background: #4b1;
+        color: #f4b400;
       }
 
       .main {
@@ -223,9 +274,10 @@
             const data = await response.json();
             this.targets = data.targets;
             this.mode = data.mode;
+            const running = this.targets.filter((target) => target.status === 'running').length;
             document.getElementById(
               'statusInfo'
-            ).textContent = `Mode: ${this.mode}\n\nTargets: ${this.targets.length}`;
+            ).textContent = `Mode: ${this.mode} · Targets: ${this.targets.length} · Running: ${running}`;
           } catch (err) {
             console.error('Failed to load targets:', err);
             document.getElementById('statusInfo').textContent =
@@ -235,18 +287,49 @@
 
         renderTargets() {
           const list = document.getElementById('targetList');
+          if (!this.targets.length) {
+            list.innerHTML = '<div class="loading">No targets discovered yet.</div>';
+            return;
+          }
+
           list.innerHTML = this.targets
             .map(
               (target) => `
-            <button class="target-btn" onclick="app.openTerminal('${target.id}', '${target.name}')">
-              ${target.name}
-            </button>
+            <div class="target-card">
+              <div class="target-card__row">
+                <div>
+                  <div class="target-card__name">${target.name}</div>
+                  <div class="target-card__meta">${target.ip} · ${target.os} · ${target.username}</div>
+                </div>
+                <span class="target-status ${target.status === 'running' ? 'running' : 'stopped'}">${target.status}</span>
+              </div>
+              <div class="target-card__actions">
+                <button
+                  class="target-btn"
+                  data-target-id="${target.id}"
+                  data-target-name="${target.name}"
+                  data-target-ip="${target.ip}"
+                >
+                  Open Terminal
+                </button>
+              </div>
+            </div>
           `
             )
             .join('');
+
+          list.querySelectorAll('.target-btn').forEach((button) => {
+            button.addEventListener('click', () => {
+              this.openTerminal(
+                button.dataset.targetId,
+                button.dataset.targetName,
+                button.dataset.targetIp
+              );
+            });
+          });
         }
 
-        openTerminal(targetId, targetName) {
+        openTerminal(targetId, targetName, targetIp) {
           const sessionId = `terminal-${Date.now()}`;
           const ws = new WebSocket(this.wsUrl);
 
@@ -314,7 +397,7 @@
           });
 
           // Add tab
-          this.addTab(sessionId, targetName);
+          this.addTab(sessionId, targetName, targetIp);
 
           // Render terminal
           this.renderTerminal(sessionId);
@@ -343,13 +426,14 @@
           });
         }
 
-        addTab(sessionId, targetName) {
+        addTab(sessionId, targetName, targetIp) {
           const tabs = document.getElementById('tabs');
           const tab = document.createElement('div');
           tab.className = 'tab';
           tab.id = `tab-${sessionId}`;
+          const label = targetIp ? `${targetName} (${targetIp})` : targetName;
           tab.innerHTML = `
-            <span>${targetName}</span>
+            <span>${label}</span>
             <span class="tab-close" onclick="app.closeTerminal('${sessionId}')">×</span>
           `;
           tab.onclick = () => this.setActiveTerminal(sessionId);

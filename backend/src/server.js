@@ -3,6 +3,8 @@ const http = require('http');
 const path = require('path');
 const config = require('./config');
 const terminalManager = require('./ws');
+const targetService = require('./proxmox');
+const { ensureProxmoxToken } = require('./setup/proxmoxToken');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,22 +14,18 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '../../frontend')));
 
 // API Routes
-
-/**
- * GET /api/targets
- * Returns list of available CTs/VMs
- */
-app.get('/api/targets', (req, res) => {
-  res.json({
-    mode: config.sshMode,
-    targets: config.targets,
-  });
+app.get('/api/targets', async (req, res) => {
+  try {
+    const targets = await targetService.getTargets();
+    res.json({
+      mode: config.sshMode,
+      targets,
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
-/**
- * GET /api/health
- * Health check endpoint
- */
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -36,18 +34,13 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-/**
- * POST /api/terminal
- * Request to open a new terminal (for future REST-based UI)
- */
-app.post('/api/terminal', (req, res) => {
+app.post('/api/terminal', async (req, res) => {
   const { targetId } = req.body;
-
   if (!targetId) {
     return res.status(400).json({ error: 'targetId required' });
   }
 
-  const target = config.targets.find((t) => t.id === targetId);
+  const target = await targetService.getTargetById(targetId);
   if (!target) {
     return res.status(404).json({ error: 'Target not found' });
   }
@@ -64,15 +57,16 @@ app.get('*', (req, res) => {
   });
 });
 
-// WebSocket setup
 terminalManager.setupWebSocketServer(server);
 
-// Start server
-const PORT = config.port;
-const HOST = config.host;
+async function startServer() {
+  await ensureProxmoxToken();
+  const targets = await targetService.getTargets();
+  const PORT = config.port;
+  const HOST = config.host;
 
-server.listen(PORT, HOST, () => {
-  console.log(`
+  server.listen(PORT, HOST, () => {
+    console.log(`
 ╔════════════════════════════════════════════════════════╗
 ║     Web SSH Bastion - Backend Server Started         ║
 ╚════════════════════════════════════════════════════════╝
@@ -82,7 +76,7 @@ Host:     http://${HOST}:${PORT}
 WebSocket: ws://${HOST}:${PORT}
 
 Targets:
-${config.targets.map((t) => `  - ${t.name} (${t.host})`).join('\n')}
+${targets.map((t) => `  - ${t.name} (${t.host})`).join('\n')}
 
 API Endpoints:
   - GET  /api/health       (server status)
@@ -92,9 +86,14 @@ API Endpoints:
 
 Ready to accept connections!
 `);
+  });
+}
+
+startServer().catch((error) => {
+  console.error('Failed to start server:', error);
+  process.exit(1);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, shutting down gracefully...');
   server.close(() => {
@@ -107,6 +106,6 @@ process.on('SIGINT', () => {
   console.log('SIGINT received, shutting down gracefully...');
   server.close(() => {
     console.log('Server closed');
-    process.exit(0);
+    process.exit(1);
   });
 });
